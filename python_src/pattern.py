@@ -59,11 +59,15 @@ def dictLoop(root_dict, handleFunc, index=0, path=''):
 def getByPath(dict, path):
     '''通过Pattern-parse中给出的字典路径访问字典'''
     if path == None: return ''
+    if dict == None: return ''
     value = dict
     try:
         for key in path.split('-'):
+            if value == None:
+                value = ''
+                break
             value = value[key]
-    except KeyError:
+    except (KeyError, TypeError):
         value = ''
     else:
         if not (isinstance(value, str) or isinstance(value, int)):

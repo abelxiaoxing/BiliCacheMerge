@@ -250,10 +250,15 @@ def videoSearch(path, pattern, _normalized=False):
         get = pattern.get(pattern_name)
         if get == None:
             get = pattern
-        if get['parse']['sid'] != None:
-            key = get['parse']['sid']
+        if get == None:
+            return False
+        parse_section = get.get('parse', {})
+        if parse_section.get('sid') != None:
+            key = parse_section['sid']
         else:
-            key = get['parse']['aid']
+            key = parse_section.get('aid')
+        if key == None:
+            return False
         try:
             with open(entry_path, 'r', encoding='utf-8') as data:
                 if getByPath(json.load(data), key) != '':
