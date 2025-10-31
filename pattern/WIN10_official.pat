@@ -1,0 +1,1 @@
+{"name": "WIN10_official", "search": {"has_group": 1, "name": ".dvi", "tree": {"v": "video.mp4", "a": "audio1.mp4", "d": "%group%_%episode%.xml", "e": "%group%.info", "c": "cover.jpg"}}, "parse": {"aid": "Aid", "bid": "Bid", "cid": "Cid", "title": "Title", "part_title": "PartName", "part_id": "PartNo", "part_num": "TotalParts", "cover_url": "CoverURL", "sid": null}}

@@ -1,0 +1,1 @@
+{"name": "UWP_xiaoyaocz_Ver3", "search": {"has_group": 1, "name": "info.json", "tree": {"v": "video.m4s", "a": "audio.m4s", "d": "%episode%.xml", "e": "info.json", "c": "thumb.jpg"}}, "parse": {"aid": "id", "bid": null, "cid": "cid", "title": "title", "part_title": "title", "part_id": "index", "part_num": null, "cover_url": "thumb", "sid": null}}

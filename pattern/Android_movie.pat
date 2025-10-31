@@ -1,0 +1,1 @@
+{"name": "Android_movie", "search": {"has_group": 0, "name": "entry.json", "tree": {"v": "%type_tag%\\video.m4s", "a": "%type_tag%\\audio.m4s", "d": "danmaku.xml", "e": "entry.json", "c": null}}, "parse": {"aid": "ep-av_id", "bid": "ep-bvid", "cid": null, "title": "title", "part_title": "ep-index", "part_id": "index_title", "part_num": null, "cover_url": "cover", "sid": null}}

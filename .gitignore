@@ -1,0 +1,360 @@
+# BiliCacheMerge - Git忽略文件配置
+# 用于版本控制时忽略不必要的文件
+
+# ==================== AI辅助开发 ====================
+# Claude AI文档和配置
+.claude/
+CLAUDE.md
+
+# ==================== 测试数据 ====================
+# 测试文件和示例数据
+test_data/
+
+# ==================== Python相关 ====================
+# Python缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 分发 / 打包
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# 单元测试 / 覆盖率报告
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# 虚拟环境
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# 环境变量
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Spyder项目设置
+.spyderproject
+.spyproject
+
+# Rope项目设置
+.ropeproject
+
+# mkdocs文档
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre类型检查器
+.pyre/
+
+# pytype静态类型检查器
+.pytype/
+
+# Cython调试文件
+cython_debug/
+
+# ==================== 项目特定文件 ====================
+# Python版本文件
+python_src/.python-version
+
+# 虚拟环境目录
+python_src/.venv/
+python_src/.venv
+python_src/venv/
+python_src/env/
+
+# 数据目录和日志文件
+python_src/data/
+python_src/*.log
+python_src/data/outTemp
+python_src/nohup.out
+
+# 配置文件（可选，如果包含敏感信息）
+python_src/config.ini
+
+# 生成的界面文件
+python_src/*_wrap.py
+python_src/*_wrap.cpp
+
+# ==================== Qt/C++相关 ====================
+# Qt相关文件
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.moc
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+Makefile*
+*build-*
+*.qm
+*.prl
+
+# Qt单元测试
+*.exe.manifest
+*.exe
+
+# Qt Creator
+*.autosave
+
+# Qt Creator QML
+*.qmlproject.user
+*.qmlproject.user.*
+
+# Qt Creator CMake
+CMakeLists.txt.user*
+
+# Qt Creator 4.x < 5.4 and 5.4 < 5.15
+*.pro.user.*
+*.pro.qmake.user.*
+
+# Qt Creator 4.5 < 5.4
+*.pro
+*.pro.*
+
+# Qt Creator 5.5<-
+*.pro.*
+
+# Qt Creator Eclipse项目
+.cproject
+.project
+
+# Qt Creator生成的文件
+*.tmp
+
+# 构建目录
+qt_src/build/
+qt_src/build-*/
+qt_src/build_*/
+qt_src/*/build/
+qt_src/*/build-*/
+qt_src/*/cmake-build-*/
+qt_src/*/buildDebug/
+qt_src/*/buildRelease/
+
+# ==================== 通用构建文件 ====================
+# 编译和链接文件
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# 目标文件
+*.target
+*.o.d
+
+# 静态库
+*.static
+
+# 共享库
+*.shared
+
+# 预编译头文件
+*.gch
+*.pch
+
+# ==================== 开发和调试 ====================
+# IDE配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 日志文件
+*.log
+*.log.*
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.rej
+*.zip
+*.tar.gz
+*.rar
+
+# 性能分析
+profile
+profiling
+
+# ==================== 依赖管理 ====================
+# Node.js (如果使用)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# CMake构建目录
+CMakeBuild/
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# ==================== 文档生成 ====================
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# ==================== 其他 ====================
+# 性能测试和基准测试
+benchmark/
+*.bench
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# 备份文件
+*.backup
+*.bak
+*.old
+*.orig
+*.tmp
+
+# 压缩文件
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# ==================== 项目特定 ====================
+# 如果有用户生成的模式文件
+pattern/user_*.pat
+pattern/custom_*.pat
+
+# 测试输出
+test_data/output/
+test_data/temp/
+
+# 用户上传的缓存文件
+cache/
+temp/
+tmp/
