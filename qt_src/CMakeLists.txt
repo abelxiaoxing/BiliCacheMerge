@@ -37,7 +37,6 @@ set(SOURCES
     src/core/FfmpegManager.cpp
     src/core/PatternManager.cpp
     src/core/FileScanner.cpp
-    src/utils/IconManager.cpp
 )
 
 set(HEADERS
@@ -47,12 +46,10 @@ set(HEADERS
     src/core/FfmpegManager.h
     src/core/PatternManager.h
     src/core/FileScanner.h
-    src/utils/IconManager.h
 )
 
 # 资源文件
 set(RESOURCES
-    resources/icons.qrc
 )
 
 # 创建可执行文件

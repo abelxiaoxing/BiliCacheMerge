@@ -3,10 +3,7 @@
 
 #include <QMainWindow>
 #include <QStatusBar>
-#include <QProgressBar>
 #include <QTextEdit>
-#include <QLineEdit>
-#include <QPushButton>
 #include <QMenuBar>
 #include <QMenu>
 #include <QAction>
@@ -15,6 +12,13 @@
 #include <QWidget>
 #include <QMessageBox>
 #include <QScrollBar>
+#include <QFrame>
+#include <QLabel>
+#include <QPushButton>
+#include <QProgressBar>
+#include <QGraphicsDropShadowEffect>
+#include <QPropertyAnimation>
+#include <QTimer>
 #include "core/ConfigManager.h"
 #include "core/FfmpegManager.h"
 #include "core/PatternManager.h"
@@ -58,6 +62,15 @@ private slots:
     // 错误跳过选项
     void onErrorSkipToggled(bool checked);
 
+    // 目录操作
+    void onDirectorySelected();
+    void onDirectoryParseSuccess();
+    void onDirectoryParseFailed(const QString &error);
+    void onMergeButtonClicked();
+
+    // 合并相关
+    void startMergeAfterScan();
+
 private:
     void createMenuBar();
     void createCentralWidget();
@@ -72,10 +85,24 @@ private:
 
     // UI组件
     QWidget* centralWidget;
-    QLineEdit* dirPathLineEdit;
-    QPushButton* dirPathButton;
-    QTextEdit* loggerTextEdit;
-    QProgressBar* progressBar;
+
+    // 主要功能区域
+    QWidget* headerWidget;           // 顶部标题区域
+    QWidget* directorySelector;      // 目录选择卡片
+    QLabel* directoryIcon;           // 目录图标
+    QLabel* directoryTitle;          // 目录选择标题
+    QPushButton* dirPathButton;      // 浏览按钮
+    QTextEdit* dirPathText;          // 目录路径显示
+    QWidget* statusIndicator;        // 状态指示器容器
+    QLabel* statusIcon;              // 状态图标
+    QLabel* statusText;              // 状态文本
+    QPushButton* mergeButton;        // 开始合并按钮
+    QWidget* logContainer;           // 日志容器
+    QTextEdit* loggerTextEdit;       // 日志输出框
+    QProgressBar* progressBar;       // 进度条（使用内置组件）
+
+    // 状态标志
+    bool m_isMerging;                // 是否处于合并状态
 
     // 核心组件
     ConfigManager* configManager;
