@@ -37,6 +37,7 @@ set(SOURCES
     src/core/FfmpegManager.cpp
     src/core/PatternManager.cpp
     src/core/FileScanner.cpp
+    src/utils/IconManager.cpp
 )
 
 set(HEADERS
@@ -46,12 +47,19 @@ set(HEADERS
     src/core/FfmpegManager.h
     src/core/PatternManager.h
     src/core/FileScanner.h
+    src/utils/IconManager.h
+)
+
+# 资源文件
+set(RESOURCES
+    resources/icons.qrc
 )
 
 # 创建可执行文件
 add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
+    ${RESOURCES}
 )
 
 # 设置包含目录
@@ -59,18 +67,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# 添加简单测试
-add_executable(simple_test simple_test.cpp)
-target_link_libraries(simple_test Qt6::Core)
-
-# 添加扫描器测试
-add_executable(test_scanner_cli test_scanner_cli.cpp
-    src/core/ConfigManager.cpp
-    src/core/PatternManager.cpp
-    src/core/FileScanner.cpp
-)
-target_include_directories(test_scanner_cli PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(test_scanner_cli Qt6::Core Qt6::Widgets)
 
 # 链接Qt库
 target_link_libraries(${PROJECT_NAME} PRIVATE
@@ -100,9 +96,6 @@ install(TARGETS ${PROJECT_NAME}
     ARCHIVE DESTINATION lib
 )
 
-# 创建测试目录
-enable_testing()
-add_subdirectory(tests EXCLUDE_FROM_ALL)
 
 # 输出构建信息
 message(STATUS "BiliCacheMerge Qt C++ Build Configuration:")
