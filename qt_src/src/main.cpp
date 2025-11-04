@@ -1,54 +1,42 @@
 #include <QApplication>
-#include <QStyleFactory>
 #include <QDir>
 #include <QStandardPaths>
-#include <QTranslator>
-#include <QLibraryInfo>
-#include <QMessageBox>
+#include "application/MainWindow.h"
 
-#include "gui/MainWindow.h"
-#include "core/ConfigManager.h"
-#include "utils/Logger.h"
-
+/**
+ * @brief BiliCacheMerge Qt C++ 版本主函数
+ *
+ * 程序启动流程:
+ * 1. 创建QApplication实例
+ * 2. 初始化应用程序设置
+ * 3. 创建主窗口
+ * 4. 启动事件循环
+ */
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
     // 设置应用程序信息
     app.setApplicationName("Qt B站缓存合并工具");
-    app.setApplicationVersion("1.0.0");
-    app.setOrganizationName("QtBiliMerge");
-    app.setOrganizationDomain("qtbili.merge");
+    app.setApplicationVersion("2.0.0");
+    app.setOrganizationName("BiliCacheMerge");
 
-    // Qt6中高DPI支持已默认启用，这些属性已被弃用
+    // 设置应用程序样式
+    app.setStyle("Fusion");
 
-    // 初始化配置管理器
-    ConfigManager::getInstance();
+    // 创建并显示主窗口
+    MainWindow mainWindow;
+    mainWindow.show();
 
-    // 初始化日志系统
-    Logger::getInstance();
-
-    // 设置中文翻译（如果需要）
-    QTranslator translator;
-    if (translator.load(QLocale(), "qt_", "_", QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
-        app.installTranslator(&translator);
+    // 如果提供了命令行参数，自动设置目录
+    if (argc > 1) {
+        QString dirPath = QString::fromLocal8Bit(argv[1]);
+        mainWindow.setDirectoryPath(dirPath);
     }
 
-    try {
-        // 创建主窗口
-        MainWindow window;
-        window.show();
+    // 记录启动日志
+    qDebug() << "=== Qt B站缓存合并工具 2.0.0 Started ===";
+    qDebug() << "主窗口初始化完成";
 
-        // 运行应用程序
-        return app.exec();
-
-    } catch (const std::exception& e) {
-        QMessageBox::critical(nullptr, "启动错误",
-                             QString("应用程序启动失败：\n%1").arg(e.what()));
-        return -1;
-    } catch (...) {
-        QMessageBox::critical(nullptr, "启动错误",
-                             "应用程序发生未知错误，启动失败。");
-        return -1;
-    }
+    return app.exec();
 }

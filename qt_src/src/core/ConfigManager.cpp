@@ -1,553 +1,339 @@
 #include "ConfigManager.h"
-#include <QStandardPaths>
 #include <QDir>
-#include <QCoreApplication>
+#include <QFileInfo>
+#include <QStandardPaths>
+#include <QApplication>
 #include <QDebug>
-#include <QMutexLocker>
 
 ConfigManager::ConfigManager(QObject *parent)
     : QObject(parent)
-    , m_configPath(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation))
 {
+    // 初始化默认路径
+    initializeDefaultPaths();
+
     // 确保配置目录存在
-    QDir configDir(m_configPath);
-    if (!configDir.exists()) {
-        configDir.mkpath(".");
+    ensureConfigDirectory();
+
+    // 加载配置文件
+    loadConfig();
+}
+
+ConfigManager::~ConfigManager()
+{
+}
+
+void ConfigManager::initializeDefaultPaths()
+{
+    // 获取应用程序基础路径
+    m_basePath = QCoreApplication::applicationDirPath();
+
+    // 设置默认路径
+    m_patternPath = QDir::cleanPath(m_basePath + "/../../../pattern");
+    m_ffmpegPath = QDir::cleanPath(m_basePath + "/../../../python_src/ffmpeg/ffmpeg");
+    m_ffprobePath = QDir::cleanPath(m_basePath + "/../../../python_src/ffmpeg/ffprobe");
+    m_logPath = QDir::cleanPath(m_basePath + "/../../python_src/data/m4sMerge_bili.log");
+
+    // 配置文件路径 (使用标准配置目录)
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    m_configFilePath = configDir + "/config.ini";
+}
+
+void ConfigManager::ensureConfigDirectory()
+{
+    QFileInfo fileInfo(m_configFilePath);
+    if (!fileInfo.dir().exists()) {
+        fileInfo.dir().mkpath(".");
     }
-
-    // 设置配置文件路径
-    m_configPath = configDir.absoluteFilePath(CONFIG_FILE_NAME);
-    m_applicationDir = QCoreApplication::applicationDirPath();
-
-    // 初始化设置
-    initializeSettings();
-    loadSettings();
-
-    qDebug() << "ConfigManager initialized with config file:" << m_configPath;
 }
 
-ConfigManager& ConfigManager::getInstance()
+bool ConfigManager::loadConfig()
 {
-    static ConfigManager instance;
-    return instance;
-}
-
-void ConfigManager::initializeSettings()
-{
-    // 创建QSettings实例
-    m_settings = std::make_unique<QSettings>(m_configPath, QSettings::IniFormat);
-
-    // Qt6中setIniCodec已被移除，默认使用UTF-8
-
     // 如果配置文件不存在，创建默认配置
-    if (!QFile::exists(m_configPath)) {
-        createDefaultConfig();
-    } else {
-        // 检查是否需要迁移旧设置
-        migrateOldSettings();
-    }
-}
-
-void ConfigManager::createDefaultConfig()
-{
-    QMutexLocker locker(&m_mutex);
-
-    // [config] 节
-    m_settings->beginGroup("config");
-    m_settings->setValue("danmu2ass", true);
-    m_settings->setValue("videoNumber", false);
-    m_settings->setValue("coverSave", false);
-    m_settings->setValue("ccdown", false);
-    m_settings->setValue("oneDir", false);
-    m_settings->setValue("overWrite", false);
-
-    // 弹幕设置
-    m_settings->setValue("fontSize", DEFAULT_FONT_SIZE);
-    m_settings->setValue("textOpacity", DEFAULT_TEXT_OPACITY);
-    m_settings->setValue("reverseBlank", DEFAULT_REVERSE_BLANK);
-    m_settings->setValue("durationMarquee", DEFAULT_DURATION_MARQUEE);
-    m_settings->setValue("durationStill", DEFAULT_DURATION_STILL);
-    m_settings->setValue("isReduceComments", false);
-    m_settings->endGroup();
-
-    // [customPath] 节
-    m_settings->beginGroup("customPath");
-    m_settings->setValue("customPermission", false);
-    m_settings->setValue("ffmpegPath", "");
-    m_settings->endGroup();
-
-    // [record] 节
-    m_settings->beginGroup("record");
-    m_settings->setValue("totalUsingTime", 0.0);
-    m_settings->setValue("totalVideoNum", 0);
-    m_settings->setValue("totalGroupNum", 0);
-    m_settings->setValue("userRank", 1);
-    m_settings->endGroup();
-
-    // [lastUsed] 节
-    m_settings->beginGroup("lastUsed");
-    m_settings->setValue("lastPattern", "");
-    m_settings->setValue("lastDirectory", "");
-    m_settings->endGroup();
-
-    // 立即保存默认配置
-    m_settings->sync();
-    qDebug() << "Default configuration created at:" << m_configPath;
-}
-
-void ConfigManager::loadSettings()
-{
-    QMutexLocker locker(&m_mutex);
-
-    if (!m_settings) {
-        qWarning() << "Settings not initialized!";
-        return;
+    if (!QFile::exists(m_configFilePath)) {
+        resetToDefaults();
+        return saveConfig();
     }
 
-    // 这里可以添加设置加载后的处理逻辑
-    qDebug() << "Settings loaded from:" << m_configPath;
-    emit settingsLoaded();
+    return loadConfigFile();
 }
 
-void ConfigManager::saveSettings()
+bool ConfigManager::saveConfig()
 {
-    QMutexLocker locker(&m_mutex);
-
-    if (!m_settings) {
-        qWarning() << "Settings not initialized!";
-        return;
-    }
-
-    m_settings->sync();
-    qDebug() << "Settings saved to:" << m_configPath;
-    emit settingsSaved();
-}
-
-// 弹幕设置
-bool ConfigManager::isDanmuConversionEnabled() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    bool value = m_settings->value("danmu2ass", true).toBool();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setDanmuConversionEnabled(bool enabled)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("danmu2ass", enabled);
-    m_settings->endGroup();
-    emit configChanged("danmu2ass", enabled);
-}
-
-int ConfigManager::getFontSize() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    int value = m_settings->value("fontSize", DEFAULT_FONT_SIZE).toInt();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setFontSize(int size)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("fontSize", size);
-    m_settings->endGroup();
-    emit configChanged("fontSize", size);
-}
-
-double ConfigManager::getTextOpacity() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    double value = m_settings->value("textOpacity", DEFAULT_TEXT_OPACITY).toDouble();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setTextOpacity(double opacity)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("textOpacity", opacity);
-    m_settings->endGroup();
-    emit configChanged("textOpacity", opacity);
-}
-
-double ConfigManager::getReverseBlank() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    double value = m_settings->value("reverseBlank", DEFAULT_REVERSE_BLANK).toDouble();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setReverseBlank(double blank)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("reverseBlank", blank);
-    m_settings->endGroup();
-    emit configChanged("reverseBlank", blank);
-}
-
-int ConfigManager::getDurationMarquee() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    int value = m_settings->value("durationMarquee", DEFAULT_DURATION_MARQUEE).toInt();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setDurationMarquee(int duration)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("durationMarquee", duration);
-    m_settings->endGroup();
-    emit configChanged("durationMarquee", duration);
-}
-
-int ConfigManager::getDurationStill() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    int value = m_settings->value("durationStill", DEFAULT_DURATION_STILL).toInt();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setDurationStill(int duration)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("durationStill", duration);
-    m_settings->endGroup();
-    emit configChanged("durationStill", duration);
-}
-
-bool ConfigManager::isReduceComments() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    bool value = m_settings->value("isReduceComments", false).toBool();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setReduceComments(bool reduce)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("isReduceComments", reduce);
-    m_settings->endGroup();
-    emit configChanged("isReduceComments", reduce);
-}
-
-// 合并设置
-bool ConfigManager::isVideoNumberingEnabled() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    bool value = m_settings->value("videoNumber", false).toBool();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setVideoNumberingEnabled(bool enabled)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("videoNumber", enabled);
-    m_settings->endGroup();
-    emit configChanged("videoNumber", enabled);
-}
-
-bool ConfigManager::isCoverSaveEnabled() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    bool value = m_settings->value("coverSave", false).toBool();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setCoverSaveEnabled(bool enabled)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("coverSave", enabled);
-    m_settings->endGroup();
-    emit configChanged("coverSave", enabled);
-}
-
-bool ConfigManager::isCCSubtitleEnabled() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    bool value = m_settings->value("ccdown", false).toBool();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setCCSubtitleEnabled(bool enabled)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("ccdown", enabled);
-    m_settings->endGroup();
-    emit configChanged("ccdown", enabled);
-}
-
-bool ConfigManager::isOneDirOutputEnabled() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    bool value = m_settings->value("oneDir", false).toBool();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setOneDirOutputEnabled(bool enabled)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("oneDir", enabled);
-    m_settings->endGroup();
-    emit configChanged("oneDir", enabled);
-}
-
-bool ConfigManager::isOverwriteEnabled() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    bool value = m_settings->value("overWrite", false).toBool();
-    m_settings->endGroup();
-    return value;
-}
-
-void ConfigManager::setOverwriteEnabled(bool enabled)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("config");
-    m_settings->setValue("overWrite", enabled);
-    m_settings->endGroup();
-    emit configChanged("overWrite", enabled);
-}
-
-// 路径设置
-QString ConfigManager::getFFmpegPath() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("customPath");
-    QString path = m_settings->value("ffmpegPath", "").toString();
-    m_settings->endGroup();
-    return path;
-}
-
-void ConfigManager::setFFmpegPath(const QString &path)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("customPath");
-    m_settings->setValue("ffmpegPath", path);
-    m_settings->endGroup();
-    emit configChanged("ffmpegPath", path);
-}
-
-bool ConfigManager::isCustomFFmpegEnabled() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("customPath");
-    bool enabled = m_settings->value("customPermission", false).toBool();
-    m_settings->endGroup();
-    return enabled;
-}
-
-void ConfigManager::setCustomFFmpegEnabled(bool enabled)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("customPath");
-    m_settings->setValue("customPermission", enabled);
-    m_settings->endGroup();
-    emit configChanged("customPermission", enabled);
-}
-
-QString ConfigManager::getPatternsPath() const
-{
-    // 模式文件通常在应用程序目录的patterns子目录下
-    return QDir(m_applicationDir).absoluteFilePath("config/patterns");
-}
-
-void ConfigManager::setPatternsPath(const QString &path)
-{
-    Q_UNUSED(path)
-    // 模式路径通常是固定的，不需要保存
-}
-
-// 用户记录
-double ConfigManager::getTotalUsingTime() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("record");
-    double time = m_settings->value("totalUsingTime", 0.0).toDouble();
-    m_settings->endGroup();
-    return time;
-}
-
-void ConfigManager::setTotalUsingTime(double time)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("record");
-    m_settings->setValue("totalUsingTime", time);
-    m_settings->endGroup();
-    emit configChanged("totalUsingTime", time);
-}
-
-int ConfigManager::getTotalVideoNum() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("record");
-    int num = m_settings->value("totalVideoNum", 0).toInt();
-    m_settings->endGroup();
-    return num;
-}
-
-void ConfigManager::setTotalVideoNum(int num)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("record");
-    m_settings->setValue("totalVideoNum", num);
-    m_settings->endGroup();
-    emit configChanged("totalVideoNum", num);
-}
-
-int ConfigManager::getTotalGroupNum() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("record");
-    int num = m_settings->value("totalGroupNum", 0).toInt();
-    m_settings->endGroup();
-    return num;
-}
-
-void ConfigManager::setTotalGroupNum(int num)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("record");
-    m_settings->setValue("totalGroupNum", num);
-    m_settings->endGroup();
-    emit configChanged("totalGroupNum", num);
-}
-
-int ConfigManager::getUserRank() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("record");
-    int rank = m_settings->value("userRank", 1).toInt();
-    m_settings->endGroup();
-    return rank;
-}
-
-void ConfigManager::setUserRank(int rank)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("record");
-    m_settings->setValue("userRank", rank);
-    m_settings->endGroup();
-    emit configChanged("userRank", rank);
-}
-
-// 最近使用
-QString ConfigManager::getLastPattern() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("lastUsed");
-    QString pattern = m_settings->value("lastPattern", "").toString();
-    m_settings->endGroup();
-    return pattern;
-}
-
-void ConfigManager::setLastPattern(const QString &pattern)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("lastUsed");
-    m_settings->setValue("lastPattern", pattern);
-    m_settings->endGroup();
-    emit configChanged("lastPattern", pattern);
-}
-
-QString ConfigManager::getLastDirectory() const
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("lastUsed");
-    QString directory = m_settings->value("lastDirectory", "").toString();
-    m_settings->endGroup();
-    return directory;
-}
-
-void ConfigManager::setLastDirectory(const QString &directory)
-{
-    QMutexLocker locker(&m_mutex);
-    m_settings->beginGroup("lastUsed");
-    m_settings->setValue("lastDirectory", directory);
-    m_settings->endGroup();
-    emit configChanged("lastDirectory", directory);
-}
-
-// 文件操作
-void ConfigManager::sync()
-{
-    QMutexLocker locker(&m_mutex);
-    if (m_settings) {
-        m_settings->sync();
-    }
+    return saveConfigFile();
 }
 
 void ConfigManager::resetToDefaults()
 {
-    createDefaultConfig();
-    loadSettings();
+    // config section
+    m_config["danmu2ass"] = true;
+    m_config["videonumber"] = 0;
+    m_config["coversave"] = false;
+    m_config["ccdown"] = false;
+    m_config["onedir"] = false;
+    m_config["overwrite"] = false;
+    m_config["lastpattern"] = "";
+    m_config["fontsize"] = 23;
+    m_config["textopacity"] = 0.6;
+    m_config["reverseblank"] = 0.67;
+    m_config["durationmarquee"] = 12;
+    m_config["durationstill"] = 6;
+    m_config["isreducecomments"] = false;
+
+    // customPath section
+    m_customPath["custompermission"] = false;
+    m_customPath["ffmpegpath"] = "";
+    m_customPath["patternfilepath"] = "";
+
+    // record section
+    m_record["userrank"] = 1;
+    m_record["totalvideonum"] = 0;
+    m_record["totalgroupnum"] = 0;
+    m_record["totalusingtime"] = 0.0;
+
+    emit configChanged();
 }
 
-// 工具方法
-QString ConfigManager::getConfigFilePath() const
+bool ConfigManager::loadConfigFile()
 {
-    return m_configPath;
-}
-
-QString ConfigManager::getLogFilePath() const
-{
-    QDir logDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
-    if (!logDir.exists()) {
-        logDir.mkpath(".");
+    QFile file(m_configFilePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "Failed to open config file:" << m_configFilePath;
+        return false;
     }
-    return logDir.absoluteFilePath(LOG_FILE_NAME);
-}
 
-QString ConfigManager::getOutputDirectory(const QString &baseDirectory) const
-{
-    if (isOneDirOutputEnabled()) {
-        return QDir(baseDirectory).absoluteFilePath(DEFAULT_OUTPUT_DIR);
+    // 读取文件内容
+    QByteArray fileData = file.readAll();
+    file.close();
+
+    // 尝试检测编码并转换为UTF-8
+    QString fileContent;
+    if (fileData.startsWith("\xFF\xFE")) {
+        // UTF-16 LE
+        fileContent = QString::fromUtf16(reinterpret_cast<const char16_t*>(fileData.constData() + 2));
+    } else if (fileData.startsWith("\xFE\xFF")) {
+        // UTF-16 BE
+        fileContent = QString::fromUtf16(reinterpret_cast<const char16_t*>(fileData.constData() + 2));
+    } else if (fileData.startsWith("\xEF\xBB\xBF")) {
+        // UTF-8 with BOM
+        fileContent = QString::fromUtf8(fileData.constData() + 3);
     } else {
-        return baseDirectory;
+        // 假设为UTF-8或本地编码
+        fileContent = QString::fromLocal8Bit(fileData);
     }
+
+    QString currentSection;
+    QStringList lines = fileContent.split('\n');
+
+    for (const QString &lineStr : lines) {
+        QString line = lineStr.trimmed();
+
+        // 跳过注释和空行
+        if (line.isEmpty() || line.startsWith(';')) {
+            continue;
+        }
+
+        // 检查是否是新的section
+        if (line.startsWith('[') && line.endsWith(']')) {
+            currentSection = line.mid(1, line.length() - 2);
+            continue;
+        }
+
+        // 解析键值对
+        int equalsPos = line.indexOf('=');
+        if (equalsPos == -1) {
+            continue;
+        }
+
+        QString key = line.left(equalsPos).trimmed().toLower();
+        QString value = line.mid(equalsPos + 1).trimmed();
+
+        // 转换值类型
+        QVariant convertedValue;
+        if (value == "1" || value == "0") {
+            convertedValue = (value == "1");
+        } else if (value.contains('.')) {
+            convertedValue = value.toDouble();
+        } else {
+            bool ok;
+            int intValue = value.toInt(&ok);
+            if (ok) {
+                convertedValue = intValue;
+            } else {
+                convertedValue = value;
+            }
+        }
+
+        // 存储到对应的section
+        if (currentSection == "config") {
+            m_config[key] = convertedValue;
+        } else if (currentSection == "customPath") {
+            m_customPath[key] = convertedValue;
+        } else if (currentSection == "record") {
+            m_record[key] = convertedValue;
+        }
+    }
+
+    emit configChanged();
+    return true;
 }
 
-void ConfigManager::migrateOldSettings()
+bool ConfigManager::saveConfigFile()
 {
-    // 这里可以添加从旧版本配置迁移的逻辑
-    // 例如从旧的配置文件位置迁移到新位置
-    Q_UNUSED(m_settings)
+    QFile file(m_configFilePath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "Failed to save config file:" << m_configFilePath;
+        return false;
+    }
+
+    // 写入文件头
+    file.write(";config file of program 'm4sMerge_bili'\n");
+    file.write(";version: 1.0\n\n");
+    file.write(";DON'T edit unless you kown its effects\n\n");
+
+    // 写入config section
+    file.write("[config]\n");
+    for (auto it = m_config.begin(); it != m_config.end(); ++it) {
+        QString key = it.key();
+        QVariant value = it.value();
+
+        // 转换键名为原始格式
+        QString originalKey = key;
+        if (key == "danmu2ass") originalKey = "danmu2ass";
+        else if (key == "videonumber") originalKey = "videonumber";
+        else if (key == "coversave") originalKey = "coversave";
+        else if (key == "ccdown") originalKey = "ccdown";
+        else if (key == "onedir") originalKey = "onedir";
+        else if (key == "overwrite") originalKey = "overwrite";
+        else if (key == "lastpattern") originalKey = "lastpattern";
+        else if (key == "fontsize") originalKey = "fontsize";
+        else if (key == "textopacity") originalKey = "textopacity";
+        else if (key == "reverseblank") originalKey = "reverseblank";
+        else if (key == "durationmarquee") originalKey = "durationmarquee";
+        else if (key == "durationstill") originalKey = "durationstill";
+        else if (key == "isreducecomments") originalKey = "isreducecomments";
+
+        // 写入值
+        if (value.type() == QVariant::Bool) {
+            file.write(QString(originalKey + "=" + (value.toBool() ? "1" : "0") + "\n").toLocal8Bit());
+        } else if (value.type() == QVariant::Double) {
+            file.write(QString(originalKey + "=" + QString::number(value.toDouble(), 'g', 10) + "\n").toLocal8Bit());
+        } else {
+            file.write(QString(originalKey + "=" + value.toString() + "\n").toLocal8Bit());
+        }
+    }
+    file.write("\n");
+
+    // 写入customPath section
+    file.write("[customPath]\n");
+    for (auto it = m_customPath.begin(); it != m_customPath.end(); ++it) {
+        QString key = it.key();
+        QVariant value = it.value();
+
+        QString originalKey = key;
+        if (key == "custompermission") originalKey = "custompermission";
+        else if (key == "ffmpegpath") originalKey = "ffmpegpath";
+        else if (key == "patternfilepath") originalKey = "patternfilepath";
+
+        if (value.type() == QVariant::Bool) {
+            file.write(QString(originalKey + "=" + (value.toBool() ? "1" : "0") + "\n").toLocal8Bit());
+        } else {
+            file.write(QString(originalKey + "=" + value.toString() + "\n").toLocal8Bit());
+        }
+    }
+    file.write("\n");
+
+    // 写入record section
+    file.write("[record]\n");
+    for (auto it = m_record.begin(); it != m_record.end(); ++it) {
+        QString key = it.key();
+        QVariant value = it.value();
+
+        QString originalKey = key;
+        if (key == "userrank") originalKey = "userrank";
+        else if (key == "totalvideonum") originalKey = "totalvideonum";
+        else if (key == "totalgroupnum") originalKey = "totalgroupnum";
+        else if (key == "totalusingtime") originalKey = "totalusingtime";
+
+        if (value.type() == QVariant::Double) {
+            file.write(QString(originalKey + "=" + QString::number(value.toDouble(), 'g', 10) + "\n").toLocal8Bit());
+        } else {
+            file.write(QString(originalKey + "=" + value.toString() + "\n").toLocal8Bit());
+        }
+    }
+    file.write("\n");
+
+    file.close();
+    return true;
 }
 
-void ConfigManager::handleConfigChange()
-{
-    // 处理配置变更的内部逻辑
-}
+// config section getters and setters
+bool ConfigManager::danmu2ass() const { return m_config.value("danmu2ass", true).toBool(); }
+void ConfigManager::setDanmu2ass(bool enabled) { m_config["danmu2ass"] = enabled; emit configChanged(); }
 
+int ConfigManager::videoNumber() const { return m_config.value("videonumber", 0).toInt(); }
+void ConfigManager::setVideoNumber(int number) { m_config["videonumber"] = number; emit configChanged(); }
+
+bool ConfigManager::coverSave() const { return m_config.value("coversave", false).toBool(); }
+void ConfigManager::setCoverSave(bool enabled) { m_config["coversave"] = enabled; emit configChanged(); }
+
+bool ConfigManager::ccDown() const { return m_config.value("ccdown", false).toBool(); }
+void ConfigManager::setCcDown(bool enabled) { m_config["ccdown"] = enabled; emit configChanged(); }
+
+bool ConfigManager::oneDir() const { return m_config.value("onedir", false).toBool(); }
+void ConfigManager::setOneDir(bool enabled) { m_config["onedir"] = enabled; emit configChanged(); }
+
+bool ConfigManager::overwrite() const { return m_config.value("overwrite", false).toBool(); }
+void ConfigManager::setOverwrite(bool enabled) { m_config["overwrite"] = enabled; emit configChanged(); }
+
+QString ConfigManager::lastPattern() const { return m_config.value("lastpattern", "").toString(); }
+void ConfigManager::setLastPattern(const QString &pattern) { m_config["lastpattern"] = pattern; emit configChanged(); }
+
+int ConfigManager::fontSize() const { return m_config.value("fontsize", 23).toInt(); }
+void ConfigManager::setFontSize(int size) { m_config["fontsize"] = size; emit configChanged(); }
+
+double ConfigManager::textOpacity() const { return m_config.value("textopacity", 0.6).toDouble(); }
+void ConfigManager::setTextOpacity(double opacity) { m_config["textopacity"] = opacity; emit configChanged(); }
+
+double ConfigManager::reverseBlank() const { return m_config.value("reverseblank", 0.67).toDouble(); }
+void ConfigManager::setReverseBlank(double blank) { m_config["reverseblank"] = blank; emit configChanged(); }
+
+int ConfigManager::durationMarquee() const { return m_config.value("durationmarquee", 12).toInt(); }
+void ConfigManager::setDurationMarquee(int duration) { m_config["durationmarquee"] = duration; emit configChanged(); }
+
+int ConfigManager::durationStill() const { return m_config.value("durationstill", 6).toInt(); }
+void ConfigManager::setDurationStill(int duration) { m_config["durationstill"] = duration; emit configChanged(); }
+
+bool ConfigManager::isReduceComments() const { return m_config.value("isreducecomments", false).toBool(); }
+void ConfigManager::setIsReduceComments(bool reduce) { m_config["isreducecomments"] = reduce; emit configChanged(); }
+
+// customPath section getters and setters
+bool ConfigManager::customPermission() const { return m_customPath.value("custompermission", false).toBool(); }
+void ConfigManager::setCustomPermission(bool permission) { m_customPath["custompermission"] = permission; emit configChanged(); }
+
+QString ConfigManager::ffmpegPath() const { return m_customPath.value("ffmpegpath", "").toString(); }
+void ConfigManager::setFfmpegPath(const QString &path) { m_customPath["ffmpegpath"] = path; emit configChanged(); }
+
+QString ConfigManager::patternFilePath() const { return m_customPath.value("patternfilepath", "").toString(); }
+void ConfigManager::setPatternFilePath(const QString &path) { m_customPath["patternfilepath"] = path; emit configChanged(); }
+
+// record section getters and setters
+int ConfigManager::userRank() const { return m_record.value("userrank", 1).toInt(); }
+void ConfigManager::setUserRank(int rank) { m_record["userrank"] = rank; emit configChanged(); }
+
+int ConfigManager::totalVideoNum() const { return m_record.value("totalvideonum", 0).toInt(); }
+void ConfigManager::setTotalVideoNum(int num) { m_record["totalvideonum"] = num; emit configChanged(); }
+
+int ConfigManager::totalGroupNum() const { return m_record.value("totalgroupnum", 0).toInt(); }
+void ConfigManager::setTotalGroupNum(int num) { m_record["totalgroupnum"] = num; emit configChanged(); }
+
+double ConfigManager::totalUsingTime() const { return m_record.value("totalusingtime", 0.0).toDouble(); }
+void ConfigManager::setTotalUsingTime(double time) { m_record["totalusingtime"] = time; emit configChanged(); }
+
+// 路径相关方法
+QString ConfigManager::configFilePath() const { return m_configFilePath; }
+QString ConfigManager::defaultPatternPath() const { return m_patternPath; }
+QString ConfigManager::defaultFfmpegPath() const {
+    return customPermission() ? ffmpegPath() : m_ffmpegPath;
+}
+QString ConfigManager::defaultFfprobePath() const { return m_ffprobePath; }
+QString ConfigManager::logFilePath() const { return m_logPath; }

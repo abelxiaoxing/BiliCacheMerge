@@ -1,118 +1,112 @@
 cmake_minimum_required(VERSION 3.16)
+project(BiliCacheMerge VERSION 2.0.0 LANGUAGES CXX)
 
-project(qt_bili_merge
-    VERSION 1.0.0
-    DESCRIPTION "Qt B站缓存合并工具"
-    LANGUAGES CXX
-)
-
-# 设置C++标准
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-# 启用Qt MOC、UIC、RCC
+# 设置Qt路径
+set(CMAKE_PREFIX_PATH "/home/abelxiaoxing/Qt/6.9.2/gcc_64")
+
+# 查找Qt6核心组件
+find_package(Qt6 6.9.2 COMPONENTS
+    Core
+    Widgets
+    Concurrent
+    Network
+    REQUIRED)
+
+# 启用自动MOC、UIC、RCC
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
 
-# 查找Qt6组件
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
+# 设置编译器标志
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 /permissive-")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
+endif()
 
-# 可选的LinguistTools组件
-find_package(Qt6 COMPONENTS LinguistTools QUIET)
-
-# 设置包含目录
-include_directories(include)
-include_directories(src)
-
-# 收集源文件
-file(GLOB_RECURSE SOURCES
-    "src/*.cpp"
-    "src/*.h"
+# 源文件列表
+set(SOURCES
+    src/main.cpp
+    src/application/MainWindow.cpp
+    src/application/ConfigDialog.cpp
+    src/core/ConfigManager.cpp
+    src/core/FfmpegManager.cpp
+    src/core/PatternManager.cpp
+    src/core/FileScanner.cpp
 )
 
-# 确保所有源文件都被包含
-message(STATUS "Source files found:")
-foreach(source ${SOURCES})
-    message(STATUS "  ${source}")
-endforeach()
-
-# 收集资源文件
-set(RESOURCES
-    resources/resources.qrc
+set(HEADERS
+    src/application/MainWindow.h
+    src/application/ConfigDialog.h
+    src/core/ConfigManager.h
+    src/core/FfmpegManager.h
+    src/core/PatternManager.h
+    src/core/FileScanner.h
 )
 
 # 创建可执行文件
 add_executable(${PROJECT_NAME}
     ${SOURCES}
-    ${RESOURCES}
+    ${HEADERS}
 )
 
+# 设置包含目录
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# 添加简单测试
+add_executable(simple_test simple_test.cpp)
+target_link_libraries(simple_test Qt6::Core)
+
+# 添加扫描器测试
+add_executable(test_scanner_cli test_scanner_cli.cpp
+    src/core/ConfigManager.cpp
+    src/core/PatternManager.cpp
+    src/core/FileScanner.cpp
+)
+target_include_directories(test_scanner_cli PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(test_scanner_cli Qt6::Core Qt6::Widgets)
+
 # 链接Qt库
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Core
     Qt6::Widgets
+    Qt6::Concurrent
     Qt6::Network
 )
 
-# 设置输出目录
+# 设置应用程序属性
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-    RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin/debug
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin/release
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
 
-# 复制FFmpeg二进制文件
+# 设置应用程序图标 (Windows)
 if(WIN32)
-    file(GLOB FFMPEG_FILES "resources/ffmpeg/*.exe")
-else()
-    file(GLOB FFMPEG_FILES "resources/ffmpeg/ffmpeg*")
-endif()
-
-foreach(FFMPEG_FILE ${FFMPEG_FILES})
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${FFMPEG_FILE}
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>
-    )
-endforeach()
-
-# 复制Qt运行时库（Windows）
-if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
-    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS ${Qt6_DIR}/../../../bin)
-    if(WINDEPLOYQT_EXECUTABLE)
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${WINDEPLOYQT_EXECUTABLE} $<TARGET_FILE:${PROJECT_NAME}>
-        )
-    endif()
-endif()
-
-# 设置调试信息
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG)
-endif()
-
-# 编译器特定设置
-if(MSVC)
-    # Windows特定设置
-    target_compile_definitions(${PROJECT_NAME} PRIVATE _WIN32_WINNT=0x0601)
-    set_property(TARGET ${PROJECT_NAME} PROPERTY WIN32_EXECUTABLE TRUE)
-else()
-    # Linux/Mac特定设置
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+    target_sources(${PROJECT_NAME} PRIVATE resources/app.rc)
 endif()
 
 # 安装规则
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
 )
 
-# 复制资源文件安装
-install(DIRECTORY resources/
-    DESTINATION share/${PROJECT_NAME}/resources
-    FILES_MATCHING PATTERN "*.qrc" PATTERN "*.png" PATTERN "*.jpg" PATTERN "*.ico"
-)
+# 创建测试目录
+enable_testing()
+add_subdirectory(tests EXCLUDE_FROM_ALL)
 
-install(DIRECTORY config/
-    DESTINATION share/${PROJECT_NAME}/config
-)
+# 输出构建信息
+message(STATUS "BiliCacheMerge Qt C++ Build Configuration:")
+message(STATUS "  Qt Version: 6.9.2")
+message(STATUS "  C++ Standard: C++17")
+message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Output Directory: ${CMAKE_BINARY_DIR}/bin")

@@ -3,132 +3,110 @@
 
 #include <QObject>
 #include <QSettings>
-#include <QString>
 #include <QDir>
-#include <QMutex>
-#include <memory>
-
-#include "qtbilimerge.h"
+#include <QStandardPaths>
+#include <QMap>
+#include <QString>
+#include <QFile>
+#include <QTextStream>
 
 /**
- * @brief 配置管理器
+ * @brief 配置管理器类
+ * 负责管理应用程序的所有配置项
+ * 对应Python版本的configparser.ConfigParser
  *
- * 单例模式，负责管理应用程序的所有配置项
- * 包括用户设置、运行记录、路径配置等
+ * 配置文件结构:
+ * - config.ini (GB18030编码)
+ * - 支持自定义路径配置
+ * - 用户记录和统计信息
  */
 class ConfigManager : public QObject
 {
     Q_OBJECT
 
 public:
-    static ConfigManager& getInstance();
+    explicit ConfigManager(QObject *parent = nullptr);
+    ~ConfigManager();
 
-    // 配置项访问方法
-    // 弹幕设置
-    bool isDanmuConversionEnabled() const;
-    void setDanmuConversionEnabled(bool enabled);
-
-    int getFontSize() const;
-    void setFontSize(int size);
-
-    double getTextOpacity() const;
-    void setTextOpacity(double opacity);
-
-    double getReverseBlank() const;
-    void setReverseBlank(double blank);
-
-    int getDurationMarquee() const;
-    void setDurationMarquee(int duration);
-
-    int getDurationStill() const;
-    void setDurationStill(int duration);
-
-    bool isReduceComments() const;
-    void setReduceComments(bool reduce);
-
-    // 合并设置
-    bool isVideoNumberingEnabled() const;
-    void setVideoNumberingEnabled(bool enabled);
-
-    bool isCoverSaveEnabled() const;
-    void setCoverSaveEnabled(bool enabled);
-
-    bool isCCSubtitleEnabled() const;
-    void setCCSubtitleEnabled(bool enabled);
-
-    bool isOneDirOutputEnabled() const;
-    void setOneDirOutputEnabled(bool enabled);
-
-    bool isOverwriteEnabled() const;
-    void setOverwriteEnabled(bool enabled);
-
-    // 路径设置
-    QString getFFmpegPath() const;
-    void setFFmpegPath(const QString &path);
-
-    bool isCustomFFmpegEnabled() const;
-    void setCustomFFmpegEnabled(bool enabled);
-
-    QString getPatternsPath() const;
-    void setPatternsPath(const QString &path);
-
-    // 用户记录
-    double getTotalUsingTime() const;
-    void setTotalUsingTime(double time);
-
-    int getTotalVideoNum() const;
-    void setTotalVideoNum(int num);
-
-    int getTotalGroupNum() const;
-    void setTotalGroupNum(int num);
-
-    int getUserRank() const;
-    void setUserRank(int rank);
-
-    // 最近使用
-    QString getLastPattern() const;
-    void setLastPattern(const QString &pattern);
-
-    QString getLastDirectory() const;
-    void setLastDirectory(const QString &directory);
-
-    // 文件操作
-    void sync();
+    // 配置加载和保存
+    bool loadConfig();
+    bool saveConfig();
     void resetToDefaults();
 
-    // 工具方法
-    QString getConfigFilePath() const;
-    QString getLogFilePath() const;
-    QString getOutputDirectory(const QString &baseDirectory) const;
+    // 配置项访问方法 - config section
+    bool danmu2ass() const;
+    void setDanmu2ass(bool enabled);
+    int videoNumber() const;
+    void setVideoNumber(int number);
+    bool coverSave() const;
+    void setCoverSave(bool enabled);
+    bool ccDown() const;
+    void setCcDown(bool enabled);
+    bool oneDir() const;
+    void setOneDir(bool enabled);
+    bool overwrite() const;
+    void setOverwrite(bool enabled);
+    QString lastPattern() const;
+    void setLastPattern(const QString &pattern);
+    int fontSize() const;
+    void setFontSize(int size);
+    double textOpacity() const;
+    void setTextOpacity(double opacity);
+    double reverseBlank() const;
+    void setReverseBlank(double blank);
+    int durationMarquee() const;
+    void setDurationMarquee(int duration);
+    int durationStill() const;
+    void setDurationStill(int duration);
+    bool isReduceComments() const;
+    void setIsReduceComments(bool reduce);
 
-public slots:
-    void loadSettings();
-    void saveSettings();
+    // 配置项访问方法 - customPath section
+    bool customPermission() const;
+    void setCustomPermission(bool permission);
+    QString ffmpegPath() const;
+    void setFfmpegPath(const QString &path);
+    QString patternFilePath() const;
+    void setPatternFilePath(const QString &path);
+
+    // 配置项访问方法 - record section
+    int userRank() const;
+    void setUserRank(int rank);
+    int totalVideoNum() const;
+    void setTotalVideoNum(int num);
+    int totalGroupNum() const;
+    void setTotalGroupNum(int num);
+    double totalUsingTime() const;
+    void setTotalUsingTime(double time);
+
+    // 路径相关
+    QString configFilePath() const;
+    QString defaultPatternPath() const;
+    QString defaultFfmpegPath() const;
+    QString defaultFfprobePath() const;
+    QString logFilePath() const;
 
 signals:
-    void configChanged(const QString &key, const QVariant &value);
-    void settingsLoaded();
-    void settingsSaved();
-
-private slots:
-    void handleConfigChange();
+    void configChanged();
 
 private:
-    explicit ConfigManager(QObject *parent = nullptr);
-    ~ConfigManager() = default;
+    void initializeDefaultPaths();
+    void ensureConfigDirectory();
+    bool loadConfigFile();
+    bool saveConfigFile();
 
-    // 禁用拷贝构造和赋值
-    ConfigManager(const ConfigManager&) = delete;
-    ConfigManager& operator=(const ConfigManager&) = delete;
+    // 配置文件路径
+    QString m_configFilePath;
+    QString m_basePath;
+    QString m_patternPath;
+    QString m_ffmpegPath;
+    QString m_ffprobePath;
+    QString m_logPath;
 
-    void initializeSettings();
-    void migrateOldSettings();
-    void createDefaultConfig();
-
-    std::unique_ptr<QSettings> m_settings;
-    QString m_configPath;
-    QString m_applicationDir;
-    mutable QMutex m_mutex;
+    // 配置数据
+    QMap<QString, QVariant> m_config;
+    QMap<QString, QVariant> m_customPath;
+    QMap<QString, QVariant> m_record;
 };
 
 #endif // CONFIGMANAGER_H
