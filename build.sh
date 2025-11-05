@@ -280,7 +280,7 @@ main() {
 
     # 检查是否在正确的目录
     if [[ ! -f "CMakeLists.txt" ]] || [[ ! -d "src" ]]; then
-        log_error "请在qt_src目录下运行此脚本"
+        log_error "请在项目根目录下运行此脚本"
         exit 1
     fi
 

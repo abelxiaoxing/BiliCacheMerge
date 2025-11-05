@@ -28,10 +28,10 @@ void ConfigManager::initializeDefaultPaths()
     // 获取应用程序基础路径
     m_basePath = QCoreApplication::applicationDirPath();
 
-    // 设置默认路径
-    m_patternPath = QDir::cleanPath(m_basePath + "/../../../pattern");
-    m_ffmpegPath = QDir::cleanPath(m_basePath + "/../../../ffmpeg/ffmpeg");
-    m_ffprobePath = QDir::cleanPath(m_basePath + "/../../../ffmpeg/ffprobe");
+    // 设置默认路径 - 使用更可靠的路径计算
+    m_patternPath = QDir::cleanPath(m_basePath + "/../../pattern");
+    m_ffmpegPath = QDir::cleanPath(m_basePath + "/../../ffmpeg/ffmpeg");
+    m_ffprobePath = QDir::cleanPath(m_basePath + "/../../ffmpeg/ffprobe");
     m_logPath = QDir::cleanPath(m_basePath + "/../../python_src/data/m4sMerge_bili.log");
 
     // 配置文件路径 (使用标准配置目录)
