@@ -258,3 +258,211 @@ double FfmpegManager::calculateProgressFromOutput(const QString &output)
     Q_UNUSED(output);
     return 0.0;
 }
+
+bool FfmpegManager::mergeAnyFormat(const QString &inputPath1, const QString &inputPath2,
+                                   const QString &outputPath, double &progress)
+{
+    Q_UNUSED(progress);
+    emit ffmpegOutput(QString("开始通用格式合并: %1 + %2").arg(inputPath1, inputPath2));
+
+    // 检测两个文件的类型
+    MediaType type1 = detectMediaType(inputPath1);
+    MediaType type2 = detectMediaType(inputPath2);
+
+    // 确定哪个是视频，哪个是音频
+    QString videoPath, audioPath;
+    if (type1 == VideoType && type2 == AudioType) {
+        videoPath = inputPath1;
+        audioPath = inputPath2;
+    } else if (type1 == AudioType && type2 == VideoType) {
+        videoPath = inputPath2;
+        audioPath = inputPath1;
+    } else {
+        emit ffmpegError("错误：无法识别的媒体文件类型");
+        return false;
+    }
+
+    // 获取格式信息
+    QString format1 = getMediaFormat(videoPath);
+    QString format2 = getMediaFormat(audioPath);
+
+    // 构建FFmpeg参数
+    QStringList args;
+    args << "-i" << videoPath << "-i" << audioPath;
+
+    // 如果需要转码（无损格式如FLAC、APE、WAV），则指定编码器
+    if (needsTranscoding(format1, format2)) {
+        emit ffmpegOutput("检测到无损格式，需要转码");
+        // 视频编码
+        if (format1 == "flac" || format1 == "ape") {
+            args << "-c:v" << "libx264" << "-preset" << "medium";
+        }
+        // 音频编码
+        if (format2 == "flac" || format2 == "ape") {
+            args << "-c:a" << "aac" << "-b:a" << "128k";
+        } else if (format2 == "wav" || format2 == "pcm") {
+            args << "-c:a" << "aac" << "-b:a" << "128k";
+        }
+    } else {
+        args << "-c" << "copy"; // 无损复制
+    }
+
+    args << "-y" << outputPath;
+
+    // 执行合并
+    m_isMerging = true;
+    m_progressTimer->start(100);
+
+    m_process = new QProcess(this);
+    connect(m_process, &QProcess::readyRead, this, &FfmpegManager::onProcessReadyRead);
+    connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &FfmpegManager::onProcessFinished);
+
+    m_process->start(m_ffmpegPath, args);
+
+    if (!m_process->waitForStarted(3000)) {
+        emit ffmpegError("启动FFmpeg失败");
+        m_isMerging = false;
+        return false;
+    }
+
+    return true;
+}
+
+bool FfmpegManager::mergeBLVFiles(const QStringList &blvFiles, const QString &outputPath, double &progress)
+{
+    if (blvFiles.isEmpty()) {
+        emit ffmpegError("BLV文件列表为空");
+        return false;
+    }
+
+    emit ffmpegOutput(QString("检测到 %1 个BLV文件").arg(blvFiles.size()));
+
+    // 单个BLV文件：直接转换容器
+    if (blvFiles.size() == 1) {
+        return mergeSingleBLV(blvFiles.first(), outputPath, progress);
+    }
+
+    // 多个BLV文件：使用concat协议合并
+    emit ffmpegOutput("使用concat协议合并多个BLV文件");
+
+    // 创建临时concat文件
+    QString tempDir = QDir::tempPath();
+    QString concatFilePath = tempDir + "/blv_concat_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + ".txt";
+
+    QFile concatFile(concatFilePath);
+    if (!concatFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        emit ffmpegError("无法创建临时concat文件");
+        return false;
+    }
+
+    QTextStream out(&concatFile);
+    for (const QString &blvFile : blvFiles) {
+        out << "file '" << blvFile << "'\n";
+    }
+    concatFile.close();
+
+    // 执行concat合并
+    QStringList args;
+    args << "-f" << "concat" << "-safe" << "0" << "-i" << concatFilePath
+         << "-c" << "copy" << "-y" << outputPath;
+
+    m_isMerging = true;
+    m_progressTimer->start(100);
+
+    m_process = new QProcess(this);
+    connect(m_process, &QProcess::readyRead, this, &FfmpegManager::onProcessReadyRead);
+    connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &FfmpegManager::onProcessFinished);
+
+    m_process->start(m_ffmpegPath, args);
+
+    bool started = m_process->waitForStarted(3000);
+    concatFile.remove(); // 立即删除临时文件
+
+    if (!started) {
+        emit ffmpegError("启动FFmpeg失败");
+        m_isMerging = false;
+        return false;
+    }
+
+    return true;
+}
+
+bool FfmpegManager::mergeSingleBLV(const QString &blvPath, const QString &outputPath, double &progress)
+{
+    emit ffmpegOutput("转换单个BLV文件");
+    emit ffmpegOutput(QString("输入: %1").arg(blvPath));
+    emit ffmpegOutput(QString("输出: %1").arg(outputPath));
+
+    QStringList args;
+    args << "-i" << blvPath << "-c" << "copy" << "-y" << outputPath;
+
+    m_isMerging = true;
+    m_progressTimer->start(100);
+
+    m_process = new QProcess(this);
+    connect(m_process, &QProcess::readyRead, this, &FfmpegManager::onProcessReadyRead);
+    connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &FfmpegManager::onProcessFinished);
+
+    m_process->start(m_ffmpegPath, args);
+
+    if (!m_process->waitForStarted(3000)) {
+        emit ffmpegError("启动FFmpeg失败");
+        m_isMerging = false;
+        return false;
+    }
+
+    return true;
+}
+
+FfmpegManager::MediaType FfmpegManager::detectMediaType(const QString &filePath)
+{
+    QFileInfo fileInfo(filePath);
+    QString ext = fileInfo.suffix().toLower();
+
+    // 视频格式
+    QStringList videoFormats = {"mp4", "avi", "mkv", "mov", "wmv", "flv", "webm", "m4v", "mpg", "mpeg"};
+    // 音频格式
+    QStringList audioFormats = {"mp3", "wav", "aac", "flac", "ogg", "m4a", "wma", "ape", "cda"};
+
+    if (videoFormats.contains(ext)) {
+        return VideoType;
+    } else if (audioFormats.contains(ext)) {
+        return AudioType;
+    }
+
+    return UnknownType;
+}
+
+QString FfmpegManager::getMediaFormat(const QString &filePath)
+{
+    QFileInfo fileInfo(filePath);
+    return fileInfo.suffix().toLower();
+}
+
+bool FfmpegManager::needsTranscoding(const QString &format1, const QString &format2)
+{
+    // 无损格式需要转码
+    QStringList losslessFormats = {"flac", "ape", "wav", "pcm"};
+
+    return losslessFormats.contains(format1) || losslessFormats.contains(format2);
+}
+
+QStringList FfmpegManager::findMatchingFiles(const QStringList &files, const QString &baseName)
+{
+    QStringList matches;
+    for (const QString &file : files) {
+        if (file.contains(baseName)) {
+            matches.append(file);
+        }
+    }
+    return matches;
+}
+
+QString FfmpegManager::extractBaseName(const QString &fileName)
+{
+    QFileInfo fileInfo(fileName);
+    return fileInfo.baseName();
+}

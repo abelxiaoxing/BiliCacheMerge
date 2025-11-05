@@ -37,6 +37,8 @@ set(SOURCES
     src/core/FfmpegManager.cpp
     src/core/PatternManager.cpp
     src/core/FileScanner.cpp
+    src/core/DanmakuConverter.cpp
+    src/core/SubtitleDownloader.cpp
 )
 
 set(HEADERS
@@ -46,6 +48,8 @@ set(HEADERS
     src/core/FfmpegManager.h
     src/core/PatternManager.h
     src/core/FileScanner.h
+    src/core/DanmakuConverter.h
+    src/core/SubtitleDownloader.h
 )
 
 # 资源文件

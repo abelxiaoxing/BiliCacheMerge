@@ -50,6 +50,9 @@ public:
         QString audioPath;
         QString danmuPath;
         QString coverPath;
+        QString blvPath;              // BLV文件路径（PC客户端格式）
+        QStringList blvFiles;         // BLV分段文件列表
+        bool isBlvFormat;             // 是否为BLV格式
         QVariantMap metadata;
     };
 
@@ -82,6 +85,12 @@ private:
     bool validateFilePath(const QString &filePath) const;
     bool validateMediaFile(const QString &filePath) const;
     bool hasValidMediaPair(const VideoFile &videoFile) const;
+
+    // BLV格式支持
+    bool isBLVFile(const QString &filePath) const;
+    QStringList findBLVSequence(const QDir &dir, const QString &prefix) const;
+    bool checkBLVFile(const QString &filePath) const;
+    void processBLVFiles(VideoFile &videoFile, const QString &directory) const;
 
     ConfigManager* m_configManager;
     PatternManager* m_patternManager;

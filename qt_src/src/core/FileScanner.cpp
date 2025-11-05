@@ -427,11 +427,16 @@ bool FileScanner::validateMediaFile(const QString &filePath) const
     // 检查常见的视频/音频文件扩展名
     QStringList validExtensions = {
         ".mp4", ".m4a", ".m4v", ".mov", ".avi", ".mkv", ".flv", ".wmv",
-        ".mp3", ".wav", ".aac", ".flac", ".ogg", ".webm", ".ts", ".m2ts", ".m4s"
+        ".mp3", ".wav", ".aac", ".flac", ".ogg", ".webm", ".ts", ".m2ts", ".m4s",
+        ".blv"  // BLV格式（B站PC客户端）
     };
 
     for (const QString &ext : validExtensions) {
         if (fileName.endsWith(ext)) {
+            // BLV格式需要额外验证
+            if (ext == ".blv") {
+                return checkBLVFile(filePath);
+            }
             return true;
         }
     }
@@ -471,4 +476,80 @@ bool FileScanner::hasValidMediaPair(const VideoFile &videoFile) const
     // 至少需要视频或音频文件中的一个有效
     // 在B站缓存中，有时可能只有视频或只有音频
     return videoValid || audioValid;
+}
+
+// BLV格式支持相关方法实现
+
+bool FileScanner::isBLVFile(const QString &filePath) const
+{
+    QFileInfo fileInfo(filePath);
+    QString fileName = fileInfo.fileName().toLower();
+    return fileName.endsWith(".blv");
+}
+
+QStringList FileScanner::findBLVSequence(const QDir &dir, const QString &prefix) const
+{
+    QStringList blvFiles;
+    QStringList filters;
+    filters << QString("%1*.blv").arg(prefix);
+
+    QStringList entries = dir.entryList(filters, QDir::Files | QDir::Readable, QDir::Name);
+
+    // 提取序号并排序
+    QMap<int, QString> numberedFiles;
+    for (const QString &fileName : entries) {
+        QRegularExpression regex(QString("%1(\\d+)\\.blv").arg(QRegularExpression::escape(prefix)));
+        QRegularExpressionMatch match = regex.match(fileName);
+        if (match.hasMatch()) {
+            int number = match.captured(1).toInt();
+            numberedFiles[number] = fileName;
+        }
+    }
+
+    // 返回排序后的文件列表
+    for (auto it = numberedFiles.begin(); it != numberedFiles.end(); ++it) {
+        blvFiles.append(dir.absoluteFilePath(it.value()));
+    }
+
+    return blvFiles;
+}
+
+bool FileScanner::checkBLVFile(const QString &filePath) const
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+
+    // 检查BLV文件头（通常是FLV格式的变种）
+    QByteArray header = file.read(16);
+    file.close();
+
+    // BLV文件通常以特定标识开始
+    // 这里简化处理，只要文件存在且非空就认为有效
+    return header.size() > 0;
+}
+
+void FileScanner::processBLVFiles(VideoFile &videoFile, const QString &directory) const
+{
+    QDir dir(directory);
+    QString entryFileName = QFileInfo(videoFile.entryPath).baseName();
+
+    // 查找所有BLV文件（通常命名为 entry.blv, entry_1.blv 等）
+    QStringList blvFiles = findBLVSequence(dir, entryFileName + "_");
+
+    // 如果没有找到带序号的，尝试直接匹配
+    if (blvFiles.isEmpty()) {
+        QString directBlv = dir.absoluteFilePath(entryFileName + ".blv");
+        if (QFile::exists(directBlv)) {
+            blvFiles.append(directBlv);
+        }
+    }
+
+    videoFile.isBlvFormat = !blvFiles.isEmpty();
+    videoFile.blvFiles = blvFiles;
+
+    if (videoFile.isBlvFormat) {
+        videoFile.blvPath = blvFiles.first(); // 主BLV文件
+    }
 }

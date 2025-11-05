@@ -33,6 +33,14 @@ public:
     bool mergeVideoAudio(const QString &videoPath, const QString &audioPath,
                         const QString &outputPath, double &progress);
 
+    // 通用视频合并（支持任意格式）
+    bool mergeAnyFormat(const QString &inputPath1, const QString &inputPath2,
+                       const QString &outputPath, double &progress);
+
+    // BLV格式合并
+    bool mergeBLVFiles(const QStringList &blvFiles, const QString &outputPath, double &progress);
+    bool mergeSingleBLV(const QString &blvPath, const QString &outputPath, double &progress);
+
 signals:
     void ffmpegOutput(const QString &output);
     void ffmpegError(const QString &error);
@@ -48,6 +56,16 @@ private:
     void initializePaths();
     void parseFfmpegOutput(const QString &output);
     double calculateProgressFromOutput(const QString &output);
+
+    // 媒体格式检测
+    enum MediaType { VideoType, AudioType, UnknownType };
+    MediaType detectMediaType(const QString &filePath);
+    QString getMediaFormat(const QString &filePath);
+    bool needsTranscoding(const QString &format1, const QString &format2);
+
+    // 智能配对
+    QStringList findMatchingFiles(const QStringList &files, const QString &baseName);
+    QString extractBaseName(const QString &fileName);
 
     ConfigManager* m_configManager;
     QString m_ffmpegPath;
