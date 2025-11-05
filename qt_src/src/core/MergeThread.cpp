@@ -177,6 +177,12 @@ void MergeThread::run()
 
     emit mergeCompleted(m_successCount, m_failedCount);
     emit statusChanged("完成");
+
+    // 调用线程完成钩子
+    bool overallSuccess = (m_failedCount == 0);
+    if (m_completionHook) {
+        m_completionHook(overallSuccess);
+    }
 }
 
 bool MergeThread::mergeSingleVideo(const FileScanner::VideoFile &videoFile, const QString &outputPath)
@@ -264,6 +270,124 @@ bool MergeThread::mergeVideoAudio(const FileScanner::VideoFile &videoFile, const
 
     double progress = 0.0;
     return m_ffmpegManager->mergeVideoAudio(videoFile.videoPath, videoFile.audioPath, outputPath, progress);
+}
+
+bool MergeThread::mergeAnyFormat(const QString &videoDir, const QString &outputFile)
+{
+    if (!m_ffmpegManager) {
+        emit errorOccurred("FFmpeg管理器未设置");
+        return false;
+    }
+
+    QDir dir(videoDir);
+    if (!dir.exists()) {
+        emit errorOccurred(QString("目录不存在: %1").arg(videoDir));
+        return false;
+    }
+
+    // 扫描目录下的所有媒体文件
+    QStringList videoExts = {"mp4", "m4s", "avi", "flv", "mkv", "rmvb", "3gp", "wmv"};
+    QStringList audioExts = {"mp3", "m4a", "aac", "wma", "wav", "ape", "flac", "cda"};
+
+    QFileInfoList allFiles = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
+    QStringList videoFiles;
+    QStringList audioFiles;
+
+    for (const QFileInfo &fileInfo : allFiles) {
+        QString ext = fileInfo.suffix().toLower();
+        if (videoExts.contains(ext)) {
+            videoFiles << fileInfo.absoluteFilePath();
+        } else if (audioExts.contains(ext)) {
+            audioFiles << fileInfo.absoluteFilePath();
+        }
+    }
+
+    if (videoFiles.isEmpty() || audioFiles.isEmpty()) {
+        emit errorOccurred("未找到可合并的视频或音频文件");
+        return false;
+    }
+
+    // 智能配对视频和音频文件
+    QString videoPath;
+    QString audioPath;
+    bool paired = false;
+
+    // 尝试按文件名配对
+    for (const QString &vFile : videoFiles) {
+        QString baseName = QFileInfo(vFile).baseName();
+        for (const QString &aFile : audioFiles) {
+            QString aBaseName = QFileInfo(aFile).baseName();
+            if (baseName == aBaseName) {
+                videoPath = vFile;
+                audioPath = aFile;
+                paired = true;
+                break;
+            }
+        }
+        if (paired) break;
+    }
+
+    // 如果没有配对成功，选择最大的视频和音频文件
+    if (!paired) {
+        qint64 maxVideoSize = 0;
+        qint64 maxAudioSize = 0;
+
+        for (const QString &vFile : videoFiles) {
+            qint64 size = QFileInfo(vFile).size();
+            if (size > maxVideoSize) {
+                maxVideoSize = size;
+                videoPath = vFile;
+            }
+        }
+
+        for (const QString &aFile : audioFiles) {
+            qint64 size = QFileInfo(aFile).size();
+            if (size > maxAudioSize) {
+                maxAudioSize = size;
+                audioPath = aFile;
+            }
+        }
+
+        if (videoPath.isEmpty() || audioPath.isEmpty()) {
+            emit errorOccurred("无法匹配视频和音频文件");
+            return false;
+        }
+
+        emit logMessage("警告：未找到匹配的音视频文件，将使用最大的文件进行合并");
+    }
+
+    // 检测音频格式，决定是否需要重编码
+    QString audioExt = QFileInfo(audioPath).suffix().toLower();
+    QStringList losslessFormats = {"flac", "ape", "wav", "cda"};
+
+    QStringList arguments;
+    arguments << "-i" << videoPath << "-i" << audioPath;
+
+    if (losslessFormats.contains(audioExt)) {
+        // 高质量音频格式需要转码为AAC
+        emit logMessage(QString("检测到高质量音频格式 %1，将转换为AAC格式").arg(audioExt));
+        arguments << "-c:v" << "copy" << "-c:a" << "aac" << "-strict" << "experimental";
+    } else {
+        // 普通格式直接复制
+        arguments << "-c" << "copy";
+    }
+
+    arguments << "-map" << "0:v:0" << "-map" << "1:a:0" << "-y" << outputFile;
+
+    emit logMessage(QString("开始合并: %1 + %2").arg(QFileInfo(videoPath).fileName())
+                                                   .arg(QFileInfo(audioPath).fileName()));
+
+    // 执行FFmpeg命令
+    QString output, error;
+    bool success = m_ffmpegManager->executeFfmpeg(arguments, output, error);
+
+    if (!success) {
+        emit errorOccurred(QString("合并失败: %1").arg(error));
+        return false;
+    }
+
+    emit logMessage(QString("✓ 合并完成: %1").arg(QFileInfo(outputFile).fileName()));
+    return true;
 }
 
 QString MergeThread::generateOutputPath(const FileScanner::VideoFile &videoFile, const QString &baseDir)
@@ -365,4 +489,15 @@ void MergeThread::waitIfPaused()
     while (m_paused && !m_stopped) {
         m_waitCondition.wait(&m_mutex);
     }
+}
+
+void MergeThread::setCompletionHook(std::function<void(bool)> hook)
+{
+    QMutexLocker locker(&m_mutex);
+    m_completionHook = hook;
+}
+
+void MergeThread::registerThreadHook(QThread *thread, std::function<void()> hook)
+{
+    QObject::connect(thread, &QThread::finished, hook);
 }

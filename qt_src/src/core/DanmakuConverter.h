@@ -85,10 +85,15 @@ private:
     QString assEscape(const QString &text);
     int calculateTextLength(const QString &text);
     QRect getZoomFactor(const QRect &source, const QRect &target);
-    QPointF convertFlashRotation(int rotY, int rotZ, QPointF pos, const QRect &stage);
+    QPointF convertFlashRotation(int rotY, int rotZ, const QPointF &pos, const QRect &stage);
+    QVariantMap safeListToMap(const QVariantList &list);
 
     // 解析位置弹幕参数
     QVariantMap parsePositionedArgs(const QString &jsonStr);
+
+    // 减少评论功能
+    bool shouldReduceComment(const DanmakuItem &current, const QList<DanmakuItem> &recentList);
+    void filterDuplicates(QList<DanmakuItem> &items);
 };
 
 #endif // DANMAKUCONVERTER_H

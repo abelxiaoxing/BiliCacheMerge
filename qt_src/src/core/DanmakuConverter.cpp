@@ -61,6 +61,12 @@ bool DanmakuConverter::convertToASS(const QString &inputXmlPath, const QString &
 
     emit conversionLog(QString("成功解析 %1 条弹幕").arg(items.size()));
 
+    // 过滤重复弹幕（如果启用）
+    if (config.reduceComments) {
+        filterDuplicates(items);
+        emit conversionLog(QString("减少重复弹幕后剩余 %1 条").arg(items.size()));
+    }
+
     // 生成ASS文件
     QFile outputFile(outputAssPath);
     if (!outputFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -353,6 +359,8 @@ void DanmakuConverter::writeStillComment(QTextStream &output, const DanmakuItem 
 void DanmakuConverter::writePositionedComment(QTextStream &output, const DanmakuItem &item,
                                               const DanmakuConfig &config, const QString &styleId)
 {
+    Q_UNUSED(config);
+
     QVariantMap args = parsePositionedArgs(item.text);
 
     if (args.isEmpty()) {
@@ -381,8 +389,6 @@ void DanmakuConverter::writePositionedComment(QTextStream &output, const Danmaku
 
     // 持续时间
     double lifetime = args.value("lifetime", 4500).toDouble() / 1000.0;
-    double duration = args.value("duration", lifetime * 1000).toDouble() / 1000.0;
-    int delay = args.value("delay", 0).toInt();
 
     QString styles;
 
@@ -425,8 +431,10 @@ int DanmakuConverter::findAvailableRow(const QList<DanmakuItem> &items, const Da
                                        const QList<QList<DanmakuItem>> &rows,
                                        const DanmakuConfig &config)
 {
+    Q_UNUSED(items);
+    Q_UNUSED(config);
+
     int lane = current.type.toInt();
-    int bottomReserved = static_cast<int>(config.stageHeight * config.reverseBlank);
 
     for (int row = 0; row < rows[lane].size(); ++row) {
         if (isRowFree(rows, lane, row, static_cast<int>(std::ceil(current.lineHeight)),
@@ -553,25 +561,227 @@ QVariantMap DanmakuConverter::parsePositionedArgs(const QString &jsonStr)
     if (error.error == QJsonParseError::NoError && doc.isObject()) {
         QJsonObject obj = doc.object();
 
-        // 提取参数
+        // 提取参数（B站弹幕格式兼容）
+        // 位置参数可能直接为数字，也可能为对象
+        QJsonValue xVal = obj.value("x");
+        QJsonValue yVal = obj.value("y");
+
+        if (xVal.isDouble()) {
+            args["from_x"] = xVal.toDouble();
+        } else if (xVal.isString()) {
+            args["from_x"] = xVal.toString().toDouble();
+        } else {
+            args["from_x"] = 0;
+        }
+
+        if (yVal.isDouble()) {
+            args["from_y"] = yVal.toDouble();
+        } else if (yVal.isString()) {
+            args["from_y"] = yVal.toString().toDouble();
+        } else {
+            args["from_y"] = 0;
+        }
+
+        args["to_x"] = obj.value("to_x").toDouble(args["from_x"].toDouble());
+        args["to_y"] = obj.value("to_y").toDouble(args["from_y"].toDouble());
         args["text"] = obj.value("text").toString();
-        args["from_x"] = obj.value("x").toDouble();
-        args["from_y"] = obj.value("y").toDouble();
-        args["to_x"] = obj.value("to_x").toDouble();
-        args["to_y"] = obj.value("to_y").toDouble();
-        args["alpha"] = obj.value("alpha").toString("1");
+
+        // 透明度参数
+        QJsonValue alphaVal = obj.value("alpha");
+        if (alphaVal.isString()) {
+            args["alpha"] = alphaVal.toString();
+        } else if (alphaVal.isDouble()) {
+            args["alpha"] = QString::number(alphaVal.toDouble());
+        } else {
+            args["alpha"] = "1";
+        }
+
+        // 旋转参数
         args["rotate_y"] = obj.value("rotate_y").toInt();
         args["rotate_z"] = obj.value("rotate_z").toInt();
+
+        // 时间参数（毫秒）
         args["lifetime"] = obj.value("lifetime").toDouble(4500);
-        args["duration"] = obj.value("duration").toDouble(4500);
+        args["duration"] = obj.value("duration").toDouble(args["lifetime"].toDouble());
         args["delay"] = obj.value("delay").toInt();
+
+        // 字体参数
         args["fontface"] = obj.value("font").toString();
+        args["fontsize"] = obj.value("fontsize").toDouble(25.0);
+
+        // 边框参数
+        args["border"] = obj.value("border").toString("true");
     } else {
-        // 简单格式解析
+        // 简单格式解析（直接文本）
         args["text"] = jsonStr;
         args["from_x"] = 0;
         args["from_y"] = 0;
+        args["to_x"] = 0;
+        args["to_y"] = 0;
+        args["alpha"] = "1";
+        args["rotate_y"] = 0;
+        args["rotate_z"] = 0;
+        args["lifetime"] = 4500;
+        args["duration"] = 4500;
+        args["delay"] = 0;
+        args["fontface"] = "";
+        args["fontsize"] = 25.0;
+        args["border"] = "true";
     }
 
     return args;
+}
+
+bool DanmakuConverter::shouldReduceComment(const DanmakuItem &current, const QList<DanmakuItem> &recentList)
+{
+    // 检查最近10秒内的相似弹幕
+    const int recentTimeWindow = 10; // 秒
+    int similarCount = 0;
+
+    for (const DanmakuItem &item : recentList) {
+        if (current.time - item.time > recentTimeWindow) {
+            break; // 超出时间窗口
+        }
+
+        // 检查文本相似度
+        QString currentText = current.text.trimmed();
+        QString itemText = item.text.trimmed();
+
+        // 完全相同
+        if (currentText == itemText) {
+            similarCount++;
+        }
+        // 文本长度相同且相似度超过80%
+        else if (currentText.length() == itemText.length()) {
+            int sameChars = 0;
+            int minLen = std::min(currentText.length(), itemText.length());
+            for (int i = 0; i < minLen; i++) {
+                if (currentText[i] == itemText[i]) {
+                    sameChars++;
+                }
+            }
+            double similarity = static_cast<double>(sameChars) / minLen;
+            if (similarity > 0.8) {
+                similarCount++;
+            }
+        }
+    }
+
+    // 如果有3个或以上相似弹幕，则减少
+    return similarCount >= 3;
+}
+
+void DanmakuConverter::filterDuplicates(QList<DanmakuItem> &items)
+{
+    QList<DanmakuItem> filtered;
+    QList<DanmakuItem> recentItems;
+
+    for (int i = 0; i < items.size(); ++i) {
+        const DanmakuItem &current = items[i];
+
+        // 检查是否应该减少此弹幕
+        if (!shouldReduceComment(current, recentItems)) {
+            filtered.append(current);
+        }
+
+        // 更新recentItems列表
+        recentItems.append(current);
+
+        // 移除超出时间窗口的弹幕
+        while (!recentItems.isEmpty() && current.time - recentItems.first().time > 10) {
+            recentItems.removeFirst();
+        }
+    }
+
+    items = filtered;
+}
+
+QRect DanmakuConverter::getZoomFactor(const QRect &source, const QRect &target)
+{
+    // 计算缩放因子，参考B站播放器大小
+    QRect result = source;
+
+    double sourceAspect = static_cast<double>(source.width()) / source.height();
+    double targetAspect = static_cast<double>(target.width()) / target.height();
+
+    if (targetAspect < sourceAspect) {
+        // 更窄
+        double scaleFactor = static_cast<double>(target.width()) / source.width();
+        int offsetY = (target.height() - target.width() / sourceAspect) / 2;
+        result = QRect(scaleFactor, 0, 0, offsetY);
+    } else if (targetAspect > sourceAspect) {
+        // 更宽
+        double scaleFactor = static_cast<double>(target.height()) / source.height();
+        int offsetX = (target.width() - target.height() * sourceAspect) / 2;
+        result = QRect(scaleFactor, offsetX, 0, 0);
+    } else {
+        // 相同比例
+        double scaleFactor = static_cast<double>(target.width()) / source.width();
+        result = QRect(scaleFactor, 0, 0, 0);
+    }
+
+    return result;
+}
+
+QPointF DanmakuConverter::convertFlashRotation(int rotY, int rotZ, const QPointF &pos, const QRect &stage)
+{
+    auto wrapAngle = [](int deg) -> int {
+        return 180 - ((180 - deg) % 360);
+    };
+
+    rotY = wrapAngle(rotY);
+    rotZ = wrapAngle(rotZ);
+
+    if (rotY == 90 || rotY == -90) {
+        rotY -= 1;
+    }
+
+    double rotYRad = rotY * M_PI / 180.0;
+    double rotZRad = rotZ * M_PI / 180.0;
+
+    double outX, outY, outZ;
+    if (rotY == 0 || rotZ == 0) {
+        outX = 0;
+        outY = -rotY; // Flash中正值为顺时针
+        outZ = -rotZ;
+    } else {
+        outY = std::atan2(-std::sin(rotYRad) * std::cos(rotZRad), std::cos(rotYRad)) * 180 / M_PI;
+        outZ = std::atan2(-std::cos(rotYRad) * std::sin(rotZRad), std::cos(rotZRad)) * 180 / M_PI;
+        outX = std::asin(std::sin(rotYRad) * std::sin(rotZRad)) * 180 / M_PI;
+    }
+
+    // 计算变换后的位置
+    double trX = (pos.x() * std::cos(rotZRad) + pos.y() * std::sin(rotZRad)) / std::cos(rotYRad)
+                 + (1 - std::cos(rotZRad) / std::cos(rotYRad)) * stage.width() / 2
+                 - std::sin(rotZRad) / std::cos(rotYRad) * stage.height() / 2;
+
+    double trY = pos.y() * std::cos(rotZRad) - pos.x() * std::sin(rotZRad)
+                 + std::sin(rotZRad) * stage.width() / 2
+                 + (1 - std::cos(rotZRad)) * stage.height() / 2;
+
+    double trZ = (trX - stage.width() / 2) * std::sin(rotYRad);
+
+    // 计算FOV
+    double FOV = stage.width() * std::tan(2 * M_PI / 9.0) / 2;
+
+    double scaleXY;
+    if (std::abs(FOV + trZ) < 0.001) {
+        scaleXY = 1;
+    } else {
+        scaleXY = FOV / (FOV + trZ);
+    }
+
+    QPointF result((trX - stage.width() / 2) * scaleXY + stage.width() / 2,
+                   (trY - stage.height() / 2) * scaleXY + stage.height() / 2);
+
+    return result;
+}
+
+QVariantMap DanmakuConverter::safeListToMap(const QVariantList &list)
+{
+    QVariantMap map;
+    for (int i = 0; i < list.size(); ++i) {
+        map[QString::number(i)] = list[i];
+    }
+    return map;
 }

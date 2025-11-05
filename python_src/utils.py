@@ -9,6 +9,7 @@ import json
 import urllib.request
 from socket import timeout as timeoutError
 import ctypes
+import platform
 from threading import Thread
 from time import sleep
 
@@ -93,15 +94,29 @@ class jsonCheck():
 
 
 def hideConsole():
-    cmd_win = ctypes.windll.kernel32.GetConsoleWindow()
-    if cmd_win != 0:
-        ctypes.windll.user32.ShowWindow(cmd_win, 0)
+    """隐藏控制台窗口（仅Windows有效）"""
+    if platform.system() != 'Windows':
+        return  # 在非Windows系统上直接返回
+    try:
+        cmd_win = ctypes.windll.kernel32.GetConsoleWindow()
+        if cmd_win != 0:
+            ctypes.windll.user32.ShowWindow(cmd_win, 0)
+    except AttributeError:
+        # 处理ctypes在某些Linux环境下的兼容性问题
+        pass
 
 
 def showConsole():
-    cmd_win = ctypes.windll.kernel32.GetConsoleWindow()
-    if cmd_win != 0:
-        ctypes.windll.user32.ShowWindow(cmd_win, 1)
+    """显示控制台窗口（仅Windows有效）"""
+    if platform.system() != 'Windows':
+        return  # 在非Windows系统上直接返回
+    try:
+        cmd_win = ctypes.windll.kernel32.GetConsoleWindow()
+        if cmd_win != 0:
+            ctypes.windll.user32.ShowWindow(cmd_win, 1)
+    except AttributeError:
+        # 处理ctypes在某些Linux环境下的兼容性问题
+        pass
 
 
 def hook(thread, *operation, lag=3):

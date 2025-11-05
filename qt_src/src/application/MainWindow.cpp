@@ -614,8 +614,7 @@ void MainWindow::onTutorialClicked()
 {
     appendLog(tr("[INFO] 打开帮助文档"));
 
-    HelpDialog helpDialog(this);
-    // 默认显示"使用说明"页面
+    HelpDialog helpDialog("tutorial", this);
     helpDialog.exec();
 }
 
@@ -623,10 +622,7 @@ void MainWindow::onQuestionClicked()
 {
     appendLog(tr("[INFO] 打开常见问题"));
 
-    HelpDialog helpDialog(this);
-    helpDialog.show();
-    // 切换到"常见问题"页面
-    // TODO: 可以添加一个方法直接跳转到指定页面
+    HelpDialog helpDialog("question", this);
     helpDialog.exec();
 }
 
@@ -634,27 +630,16 @@ void MainWindow::onConsultClicked()
 {
     appendLog(tr("[INFO] 打开反馈信息"));
 
-    HelpDialog helpDialog(this);
-    helpDialog.show();
-    // 切换到"反馈信息"页面
+    HelpDialog helpDialog("consult", this);
     helpDialog.exec();
 }
 
 void MainWindow::onAboutClicked()
 {
-    QString aboutText = tr(
-        "Qt B站缓存合并工具\n"
-        "版本: 2.0.0\n"
-        "构建时间: 2025-11-05\n\n"
-        "基于Qt6 + C++开发\n"
-        "现代化界面设计\n"
-        "高性能视频处理\n\n"
-        "作者: BiliCacheMerge开发团队\n"
-        "许可证: MIT License\n\n"
-        "感谢使用！"
-    );
+    appendLog(tr("[INFO] 打开关于信息"));
 
-    QMessageBox::about(this, tr("关于"), aboutText);
+    HelpDialog helpDialog("about", this);
+    helpDialog.exec();
 }
 
 void MainWindow::onLogClicked()
@@ -693,6 +678,15 @@ void MainWindow::onPatternBuildClicked()
     }
 
     PatternBuilderDialog dialog(configManager, this);
+
+    // 在无头环境中跳过exec()
+    #ifdef Q_OS_UNIX
+    if (qgetenv("DISPLAY").isEmpty() && qgetenv("WAYLAND_DISPLAY").isEmpty()) {
+        appendLog(tr("[INFO] 无头环境，跳过对话框显示"));
+        return;
+    }
+    #endif
+
     if (dialog.exec() == QDialog::Accepted) {
         appendLog(tr("[SUCCESS] 模式构建完成"));
         QMessageBox::information(this, tr("成功"), tr("新模式已创建并保存！"));

@@ -22,7 +22,7 @@ class HelpDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit HelpDialog(QWidget *parent = nullptr);
+    explicit HelpDialog(const QString &defaultTopic = QString(), QWidget *parent = nullptr);
     ~HelpDialog();
 
 private slots:
@@ -46,6 +46,9 @@ private:
 
     // 帮助内容数据
     QMap<QString, QString> m_helpContent;
+
+    // 默认显示主题
+    QString m_defaultTopic;
 };
 
 #endif // HELPDIALOG_H

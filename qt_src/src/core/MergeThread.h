@@ -9,6 +9,7 @@
 #include <QList>
 #include <QMutex>
 #include <QWaitCondition>
+#include <functional>
 
 class ConfigManager;
 class FfmpegManager;
@@ -60,6 +61,10 @@ public:
     int getCurrentIndex() const { return m_currentIndex; }
     int getTotalCount() const { return m_totalCount; }
 
+    // 线程完成回调钩子
+    void setCompletionHook(std::function<void(bool)> hook);
+    void registerThreadHook(QThread *thread, std::function<void()> hook);
+
 signals:
     void progressUpdated(int current, int total);
     void logMessage(const QString &message);
@@ -76,6 +81,7 @@ private:
     bool mergeSingleVideo(const FileScanner::VideoFile &videoFile, const QString &outputDir);
     bool mergeBLVFiles(const FileScanner::VideoFile &videoFile, const QString &outputPath);
     bool mergeVideoAudio(const FileScanner::VideoFile &videoFile, const QString &outputPath);
+    bool mergeAnyFormat(const QString &videoDir, const QString &outputFile);
 
     // 辅助功能
     QString generateOutputPath(const FileScanner::VideoFile &videoFile, const QString &baseDir);
@@ -104,6 +110,9 @@ private:
     QWaitCondition m_waitCondition;
     bool m_paused;
     bool m_stopped;
+
+    // 线程完成回调钩子
+    std::function<void(bool)> m_completionHook;
 };
 
 #endif // MERGETHREAD_H

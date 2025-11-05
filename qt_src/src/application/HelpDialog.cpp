@@ -3,12 +3,13 @@
 #include <QApplication>
 #include <QScreen>
 
-HelpDialog::HelpDialog(QWidget *parent)
+HelpDialog::HelpDialog(const QString &defaultTopic, QWidget *parent)
     : QDialog(parent)
+    , m_defaultTopic(defaultTopic)
 {
-    setWindowTitle("使用说明 - B站缓存合并工具");
-    setMinimumSize(900, 700);
-    resize(900, 700);
+    setWindowTitle("帮助与使用指南 - B站缓存合并工具");
+    setMinimumSize(900, 600);
+    resize(900, 600);
 
     // 居中显示
     QRect screenGeometry = QApplication::primaryScreen()->geometry();
@@ -27,19 +28,23 @@ HelpDialog::~HelpDialog()
 void HelpDialog::createContent()
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(10, 10, 10, 10);
-    layout->setSpacing(10);
+    layout->setContentsMargins(5, 5, 5, 5);  // 减少外边距从10到5
+    layout->setSpacing(5);  // 减少间距从10到5
 
     // 标题
     QLabel *titleLabel = new QLabel("帮助与使用指南", this);
     titleLabel->setStyleSheet(
         "QLabel {"
-        "    font-size: 24px;"
+        "    font-size: 18px;"
         "    font-weight: bold;"
         "    color: #2196F3;"
-        "    padding: 10px;"
+        "    padding: 5px;"
         "}"
     );
+    titleLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    // 设置标题为固定高度，减少上下空白
+    titleLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    titleLabel->setMaximumHeight(35);
     layout->addWidget(titleLabel);
 
     // 分割器
@@ -57,18 +62,22 @@ void HelpDialog::createContent()
     QWidget *rightWidget = new QWidget(this);
     QVBoxLayout *rightLayout = new QVBoxLayout(rightWidget);
     rightLayout->setContentsMargins(0, 0, 0, 0);
+    rightLayout->setSpacing(5);  // 设置紧凑的间距
 
     // 搜索框
     m_searchEdit = new QLineEdit(this);
     m_searchEdit->setPlaceholderText("搜索帮助内容...");
     m_searchEdit->setStyleSheet(
         "QLineEdit {"
-        "    padding: 8px;"
+        "    padding: 5px;"
         "    border: 1px solid #ccc;"
         "    border-radius: 4px;"
         "    font-size: 14px;"
         "}"
     );
+    // 设置搜索框为固定高度，减少垂直空间占用
+    m_searchEdit->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_searchEdit->setMaximumHeight(30);
     rightLayout->addWidget(m_searchEdit);
 
     // 内容浏览器
@@ -83,13 +92,17 @@ void HelpDialog::createContent()
         "    font-size: 14px;"
         "}"
     );
+    // 确保内容浏览器能够伸展占据剩余空间
+    m_contentBrowser->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     rightLayout->addWidget(m_contentBrowser);
 
     // 关闭按钮
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonLayout->addStretch();
+    buttonLayout->setContentsMargins(5, 5, 5, 5);
     m_closeButton = new QPushButton("关闭", this);
     m_closeButton->setDefault(true);
+    m_closeButton->setMaximumWidth(80);
     buttonLayout->addWidget(m_closeButton);
     layout->addLayout(buttonLayout);
 
@@ -135,8 +148,17 @@ void HelpDialog::populateTopics()
     // 展开所有项目
     m_topicTree->expandAll();
 
-    // 选择第一个主题
-    m_topicTree->setCurrentItem(tutorialItem);
+    // 根据m_defaultTopic选择要显示的主题
+    QTreeWidgetItem *itemToSelect = tutorialItem; // 默认使用说明
+    if (m_defaultTopic == "question") {
+        itemToSelect = questionItem;
+    } else if (m_defaultTopic == "consult") {
+        itemToSelect = consultItem;
+    } else if (m_defaultTopic == "about") {
+        itemToSelect = aboutItem;
+    }
+
+    m_topicTree->setCurrentItem(itemToSelect);
 }
 
 void HelpDialog::onTopicChanged(QTreeWidgetItem *item, QTreeWidgetItem *previous)
@@ -162,7 +184,6 @@ void HelpDialog::onSearchChanged(const QString &text)
 QString HelpDialog::getTutorialContent()
 {
     return QString(
-        "<h2>使用说明</h2>"
         "<h3>1. 基本操作</h3>"
         "<p><strong>步骤1：选择目录</strong><br/>"
         "点击上方的\"浏览\"按钮，选择包含B站缓存文件的目录。程序支持以下客户端的缓存格式：</p>"
@@ -222,8 +243,6 @@ QString HelpDialog::getTutorialContent()
 QString HelpDialog::getQuestionContent()
 {
     return QString(
-        "<h2>常见问题</h2>"
-
         "<h3>Q1：程序提示\"FFmpeg载入失败\"怎么办？</h3>"
         "<p><strong>A：</strong>请检查以下几点：</p>"
         "<ul>"
@@ -305,8 +324,6 @@ QString HelpDialog::getQuestionContent()
 QString HelpDialog::getConsultContent()
 {
     return QString(
-        "<h2>反馈信息</h2>"
-
         "<h3>获取帮助</h3>"
         "<p>如果您在使用过程中遇到问题，可以通过以下方式获取帮助：</p>"
         "<ul>"
@@ -380,8 +397,6 @@ QString HelpDialog::getConsultContent()
 QString HelpDialog::getAboutContent()
 {
     return QString(
-        "<h2>关于软件</h2>"
-
         "<h3>软件信息</h3>"
         "<p><strong>软件名称：</strong> B站缓存合并工具<br/>"
         "<strong>版本：</strong> 2.0.0<br/>"
@@ -428,9 +443,8 @@ QString HelpDialog::getAboutContent()
         "</ul>"
 
         "<h3>开发者信息</h3>"
-        "<p><strong>主要开发者：</strong> [Your Name]<br/>"
-        "<strong>联系方式：</strong> [Your Email]<br/>"
-        "<strong>主页：</strong> <a href='https://your-website.com'>https://your-website.com</a></p>"
+        "<p><strong>主要开发者：</strong> abelxiaoxing<br/>"
+        "<strong>源码仓库：</strong> <a href='https://github.com/abelxiaoxing/BiliCacheMerge'>GitHub Repository</a></p>"
 
         "<h3>开源协议</h3>"
         "<p>本软件采用 MIT 许可证，您可以：</p>"
@@ -459,7 +473,7 @@ QString HelpDialog::getAboutContent()
         "</ul>"
 
         "<p style='text-align: center; margin-top: 30px; color: #666;'>"
-        "© 2025 B站缓存合并工具开发团队. 保留所有权利."
+        "© 2025 abelxiaoxing. 保留所有权利."
         "</p>"
     );
 }

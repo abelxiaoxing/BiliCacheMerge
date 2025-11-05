@@ -9,19 +9,27 @@
 
 PatternBuilderDialog::PatternBuilderDialog(ConfigManager *configManager, QWidget *parent)
     : QDialog(parent)
-    , m_configManager(configManager)
     , m_currentStep(0)
+    , m_configManager(configManager)
 {
     setWindowTitle("搜索模式创建向导");
     setModal(true);
-    resize(800, 600);
+    resize(900, 700);
 
+    // 创建并配置QWizard
     m_wizard = new QWizard(this);
+    m_wizard->setWizardStyle(QWizard::ModernStyle);
+    m_wizard->setOption(QWizard::HaveHelpButton, true);
+    m_wizard->setOption(QWizard::HelpButtonOnRight, false);
+    m_wizard->setTitleFormat(Qt::RichText);
+    m_wizard->setSubTitleFormat(Qt::RichText);
+
     createPages();
     setupConnections();
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->addWidget(m_wizard);
+    layout->setContentsMargins(10, 10, 10, 10);
 
     updateStepIndicator();
 }
@@ -54,9 +62,9 @@ void PatternBuilderDialog::createPages()
     m_dirStatusLabel->setStyleSheet("color: gray;");
     layout1->addWidget(m_dirStatusLabel);
 
-    QPushButton *scanButton = new QPushButton("开始扫描");
-    scanButton->setDefault(true);
-    layout1->addWidget(scanButton);
+    m_scanButton = new QPushButton("开始扫描");
+    m_scanButton->setDefault(true);
+    layout1->addWidget(m_scanButton);
 
     m_scanProgress = new QProgressBar();
     m_scanProgress->setVisible(false);
@@ -72,15 +80,14 @@ void PatternBuilderDialog::createPages()
 
     layout1->addStretch();
 
-    m_wizard->addPage(createWizardPage(page1));
+    QWizardPage *wizardPage1 = createWizardPage(page1);
+    wizardPage1->setTitle("步骤1: 选择目录");
+    wizardPage1->setSubTitle("请选择包含B站缓存文件的目录，程序将自动识别文件结构");
+    m_wizard->addPage(wizardPage1);
 
     // 步骤2：文件映射
     QWidget *page2 = new QWidget();
     QVBoxLayout *layout2 = new QVBoxLayout(page2);
-
-    QLabel *titleLabel2 = new QLabel("步骤2: 映射文件类型");
-    titleLabel2->setStyleSheet("font-size: 16px; font-weight: bold;");
-    layout2->addWidget(titleLabel2);
 
     QLabel *descLabel2 = new QLabel("请指定每种类型的文件对应的文件");
     layout2->addWidget(descLabel2);
@@ -121,26 +128,21 @@ void PatternBuilderDialog::createPages()
 
     layout2->addStretch();
 
-    m_wizard->addPage(createWizardPage(page2));
+    QWizardPage *wizardPage2 = createWizardPage(page2);
+    wizardPage2->setTitle("步骤2: 映射文件类型");
+    wizardPage2->setSubTitle("请指定每种类型的文件对应的文件");
+    m_wizard->addPage(wizardPage2);
 
     // 步骤3：字段映射
     QWidget *page3 = new QWidget();
     QVBoxLayout *layout3 = new QVBoxLayout(page3);
 
-    QLabel *titleLabel3 = new QLabel("步骤3: 映射元数据字段");
-    titleLabel3->setStyleSheet("font-size: 16px; font-weight: bold;");
-    layout3->addWidget(titleLabel3);
-
     QLabel *descLabel3 = new QLabel("请选择入口文件中对应字段的含义");
     layout3->addWidget(descLabel3);
 
-    QJsonObject jsonObj = m_recognizedJson;
-    QTreeWidgetItem *rootItem = new QTreeWidgetItem();
-    rootItem->setText(0, "entry.json");
-    parseJsonToTree(jsonObj, rootItem);
+    // 注意：m_recognizedJson在构造函数中为空，在scanDirectory()后会被填充
+    // 这里先创建空的Tree，在setupConnections()中的currentIdChanged信号处理中会重新填充
     m_jsonTree = new QTreeWidget();
-    m_jsonTree->addTopLevelItem(rootItem);
-    m_jsonTree->expandAll();
     layout3->addWidget(m_jsonTree);
 
     QGridLayout *fieldLayout = new QGridLayout();
@@ -168,15 +170,14 @@ void PatternBuilderDialog::createPages()
     layout3->addLayout(fieldLayout);
     layout3->addStretch();
 
-    m_wizard->addPage(createWizardPage(page3));
+    QWizardPage *wizardPage3 = createWizardPage(page3);
+    wizardPage3->setTitle("步骤3: 映射元数据字段");
+    wizardPage3->setSubTitle("请选择入口文件中对应字段的含义");
+    m_wizard->addPage(wizardPage3);
 
     // 步骤4：确认
     QWidget *page4 = new QWidget();
     QVBoxLayout *layout4 = new QVBoxLayout(page4);
-
-    QLabel *titleLabel4 = new QLabel("步骤4: 确认并保存");
-    titleLabel4->setStyleSheet("font-size: 16px; font-weight: bold;");
-    layout4->addWidget(titleLabel4);
 
     QLabel *nameLabel = new QLabel("模式名称:");
     m_patternNameEdit = new QLineEdit();
@@ -194,7 +195,10 @@ void PatternBuilderDialog::createPages()
 
     layout4->addStretch();
 
-    m_wizard->addPage(createWizardPage(page4));
+    QWizardPage *wizardPage4 = createWizardPage(page4);
+    wizardPage4->setTitle("步骤4: 确认并保存");
+    wizardPage4->setSubTitle("请输入模式名称并预览生成的配置");
+    m_wizard->addPage(wizardPage4);
 
     // 连接按钮信号
     connect(m_browseButton, &QPushButton::clicked, this, &PatternBuilderDialog::onBrowseClicked);
@@ -205,7 +209,8 @@ void PatternBuilderDialog::createPages()
 
 QWizardPage *PatternBuilderDialog::createWizardPage(QWidget *widget)
 {
-    QWizardPage *page = new QWizardPage();
+    // 使用QWizard作为parent，确保正确的内存管理
+    QWizardPage *page = new QWizardPage(m_wizard);
     QVBoxLayout *layout = new QVBoxLayout(page);
     layout->addWidget(widget);
     return page;
@@ -229,10 +234,23 @@ void PatternBuilderDialog::setupConnections()
         }
     });
 
-    connect(m_wizard->button(QWizard::NextButton), &QPushButton::clicked, this, &PatternBuilderDialog::onNextClicked);
-    connect(m_wizard->button(QWizard::BackButton), &QPushButton::clicked, this, &PatternBuilderDialog::onBackClicked);
-    connect(m_wizard->button(QWizard::FinishButton), &QPushButton::clicked, this, &PatternBuilderDialog::onFinishClicked);
-    connect(m_wizard->button(QWizard::CancelButton), &QPushButton::clicked, this, &PatternBuilderDialog::onCancelClicked);
+    // 连接按钮信号 - 安全的空指针检查
+    // 注意：QWizard::button()返回QAbstractButton*，需要使用QAbstractButton::clicked信号
+    if (QAbstractButton *nextButton = m_wizard->button(QWizard::NextButton)) {
+        connect(nextButton, &QAbstractButton::clicked, this, &PatternBuilderDialog::onNextClicked);
+    }
+
+    if (QAbstractButton *backButton = m_wizard->button(QWizard::BackButton)) {
+        connect(backButton, &QAbstractButton::clicked, this, &PatternBuilderDialog::onBackClicked);
+    }
+
+    if (QAbstractButton *finishButton = m_wizard->button(QWizard::FinishButton)) {
+        connect(finishButton, &QAbstractButton::clicked, this, &PatternBuilderDialog::onFinishClicked);
+    }
+
+    if (QAbstractButton *cancelButton = m_wizard->button(QWizard::CancelButton)) {
+        connect(cancelButton, &QAbstractButton::clicked, this, &PatternBuilderDialog::onCancelClicked);
+    }
 }
 
 void PatternBuilderDialog::onBrowseClicked()
@@ -404,9 +422,18 @@ void PatternBuilderDialog::onFileItemDoubleClicked(QListWidgetItem *item)
 
 void PatternBuilderDialog::populateJsonTree()
 {
+    if (!m_jsonTree) {
+        return;
+    }
+
     m_jsonTree->clear();
 
     if (m_recognizedJson.isEmpty()) {
+        QTreeWidgetItem *emptyItem = new QTreeWidgetItem();
+        emptyItem->setText(0, "提示");
+        emptyItem->setText(1, "请先在步骤1中选择目录并扫描文件");
+        m_jsonTree->addTopLevelItem(emptyItem);
+        m_jsonTree->expandAll();
         return;
     }
 
@@ -419,6 +446,10 @@ void PatternBuilderDialog::populateJsonTree()
 
 void PatternBuilderDialog::parseJsonToTree(const QJsonObject &json, QTreeWidgetItem *parent)
 {
+    if (!parent) {
+        return;
+    }
+
     for (auto it = json.begin(); it != json.end(); ++it) {
         QTreeWidgetItem *childItem = new QTreeWidgetItem(parent);
         childItem->setText(0, it.key());
@@ -434,6 +465,8 @@ void PatternBuilderDialog::parseJsonToTree(const QJsonObject &json, QTreeWidgetI
             childItem->setText(1, QString::number(it->toDouble()));
         } else if (it->isBool()) {
             childItem->setText(1, it->toBool() ? "true" : "false");
+        } else {
+            childItem->setText(1, "<未知类型>");
         }
 
         parent->addChild(childItem);

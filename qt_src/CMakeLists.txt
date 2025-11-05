@@ -43,6 +43,7 @@ set(SOURCES
     src/core/DanmakuConverter.cpp
     src/core/SubtitleDownloader.cpp
     src/core/CoverDownloader.cpp
+    src/core/Utils.cpp
 )
 
 set(HEADERS
@@ -58,6 +59,7 @@ set(HEADERS
     src/core/DanmakuConverter.h
     src/core/SubtitleDownloader.h
     src/core/CoverDownloader.h
+    src/core/Utils.h
 )
 
 # 资源文件
@@ -83,6 +85,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Widgets
     Qt6::Concurrent
     Qt6::Network
+    m
 )
 
 # 设置应用程序属性
