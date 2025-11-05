@@ -86,6 +86,12 @@ private:
     bool validateMediaFile(const QString &filePath) const;
     bool hasValidMediaPair(const VideoFile &videoFile) const;
 
+    // JSON检查和修复
+    bool validateAndRepairJson(const QString &filePath, QJsonDocument &doc);
+    bool checkAndFixJsonFormat(const QString &filePath, QString &fixedContent);
+    void fixJsonContent(QString &content);
+    QString findMatchingBrace(const QString &content, int startPos) const;
+
     // BLV格式支持
     bool isBLVFile(const QString &filePath) const;
     QStringList findBLVSequence(const QDir &dir, const QString &prefix) const;

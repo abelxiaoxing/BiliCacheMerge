@@ -1,5 +1,8 @@
 #include "MainWindow.h"
 #include "ConfigDialog.h"
+#include "HelpDialog.h"
+#include "LogViewer.h"
+#include "PatternBuilderDialog.h"
 #include "core/ConfigManager.h"
 #include "core/FfmpegManager.h"
 #include "core/PatternManager.h"
@@ -163,6 +166,7 @@ void MainWindow::createCentralWidget()
     dirPathText = new QTextEdit(this);
     dirPathText->setMaximumHeight(45);
     dirPathText->setPlaceholderText("请选择B站缓存目录...");
+    dirPathText->setAcceptDrops(false);  // 不直接接收拖拽，而是通过父组件接收
     dirPathText->setStyleSheet(
         "QTextEdit {"
         "    background-color: #F5F5F5;"
@@ -177,6 +181,11 @@ void MainWindow::createCentralWidget()
         "    background-color: white;"
         "}"
     );
+
+    // 启用拖拽支持
+    setAcceptDrops(true);
+    directorySelector->setAcceptDrops(true);
+    dirPathText->setAcceptDrops(false);  // 防止文本框接收拖拽
 
     // 不使用图标，让文字完美居中
     dirPathButton = new QPushButton("浏览", this);
@@ -600,65 +609,131 @@ void MainWindow::onPauseClicked()
     appendLog(tr("[INFO] Pause command from user"));
 }
 
-void MainWindow::onSettingsClicked()
-{
-    if (!configManager) {
-        appendLog(tr("[ERROR] 配置管理器未初始化"));
-        return;
-    }
 
-    ConfigDialog dialog(configManager, this);
-    if (dialog.exec() == QDialog::Accepted) {
-        appendLog(tr("[INFO] 设置已更新"));
-        if (ffmpegManager) {
-            QString version = ffmpegManager->ffmpegVersion();
-            if (!version.isEmpty()) {
-                appendLog(tr("FFmpeg版本: %1").arg(version));
-            } else {
-                appendLog(tr("FFmpeg载入失败！"));
-            }
-        }
+void MainWindow::onTutorialClicked()
+{
+    appendLog(tr("[INFO] 打开帮助文档"));
+
+    HelpDialog helpDialog(this);
+    // 默认显示"使用说明"页面
+    helpDialog.exec();
+}
+
+void MainWindow::onQuestionClicked()
+{
+    appendLog(tr("[INFO] 打开常见问题"));
+
+    HelpDialog helpDialog(this);
+    helpDialog.show();
+    // 切换到"常见问题"页面
+    // TODO: 可以添加一个方法直接跳转到指定页面
+    helpDialog.exec();
+}
+
+void MainWindow::onConsultClicked()
+{
+    appendLog(tr("[INFO] 打开反馈信息"));
+
+    HelpDialog helpDialog(this);
+    helpDialog.show();
+    // 切换到"反馈信息"页面
+    helpDialog.exec();
+}
+
+void MainWindow::onAboutClicked()
+{
+    QString aboutText = tr(
+        "Qt B站缓存合并工具\n"
+        "版本: 2.0.0\n"
+        "构建时间: 2025-11-05\n\n"
+        "基于Qt6 + C++开发\n"
+        "现代化界面设计\n"
+        "高性能视频处理\n\n"
+        "作者: BiliCacheMerge开发团队\n"
+        "许可证: MIT License\n\n"
+        "感谢使用！"
+    );
+
+    QMessageBox::about(this, tr("关于"), aboutText);
+}
+
+void MainWindow::onLogClicked()
+{
+    appendLog(tr("[INFO] 打开日志查看器"));
+
+    LogViewer logViewer(this);
+    logViewer.exec();
+}
+
+void MainWindow::onQuitClicked()
+{
+    appendLog(tr("[INFO] 用户请求退出程序"));
+
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(this, tr("确认退出"),
+                                  tr("确定要退出程序吗？"),
+                                  QMessageBox::Yes | QMessageBox::No,
+                                  QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+        appendLog(tr("[INFO] 正在退出程序..."));
+        QApplication::quit();
+    } else {
+        appendLog(tr("[INFO] 用户取消退出"));
     }
 }
 
 void MainWindow::onPatternBuildClicked()
 {
-    appendLog(tr("[INFO] Pattern build wizard started"));
+    appendLog(tr("[INFO] 打开模式构建向导"));
+
+    if (!configManager) {
+        QMessageBox::critical(this, tr("错误"), tr("配置管理器未初始化"));
+        return;
+    }
+
+    PatternBuilderDialog dialog(configManager, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        appendLog(tr("[SUCCESS] 模式构建完成"));
+        QMessageBox::information(this, tr("成功"), tr("新模式已创建并保存！"));
+    } else {
+        appendLog(tr("[INFO] 用户取消模式构建"));
+    }
 }
 
 void MainWindow::onJsonCheckClicked()
 {
-    appendLog(tr("[WARNING] Json repair function is dangerous!"));
+    appendLog(tr("[INFO] JSON检查功能已集成到文件扫描过程中"));
+
+    QMessageBox::information(
+        this,
+        tr("JSON检查"),
+        tr("JSON检查和修复功能已自动集成到文件扫描过程中。\n\n"
+           "当扫描文件时，系统会自动：\n"
+           "1. 检查JSON文件格式\n"
+           "2. 修复常见的格式错误\n"
+           "3. 跳过无法修复的损坏文件\n\n"
+           "请选择包含JSON文件的目录进行扫描以查看效果。")
+    );
 }
 
-void MainWindow::onTutorialClicked()
+void MainWindow::onSettingsClicked()
 {
-    appendLog(tr("[INFO] Tutorial opened"));
-}
+    if (!configManager) {
+        QMessageBox::critical(this, tr("错误"), tr("配置管理器未初始化"));
+        return;
+    }
 
-void MainWindow::onQuestionClicked()
-{
-    appendLog(tr("[INFO] FAQ opened"));
-}
+    appendLog(tr("[INFO] 打开设置对话框"));
 
-void MainWindow::onConsultClicked()
-{
-    appendLog(tr("[INFO] Feedback form opened"));
-}
-
-void MainWindow::onAboutClicked()
-{
-    QMessageBox::about(this, tr("关于"),
-                      tr("Qt B站缓存合并工具\n版本: 2.0.0\n\n基于Qt6 + C++开发"));
-}
-
-void MainWindow::onLogClicked()
-{
-    appendLog(tr("[INFO] Log file opened"));
-}
-
-void MainWindow::onQuitClicked()
-{
+    ConfigDialog dialog(configManager, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        appendLog(tr("[SUCCESS] 设置已保存"));
+        // 保存配置
+        configManager->saveConfig();
+    } else {
+        appendLog(tr("[INFO] 用户取消设置"));
+    }
 }
 
 void MainWindow::onErrorSkipToggled(bool checked)
@@ -683,6 +758,9 @@ void MainWindow::startMergeAfterScan()
 
     appendLog(tr("[INFO] 找到 %1 个视频组，开始合并").arg(videoGroups.size()));
 
+    // 🔧 修复：在连接新信号前，先断开所有之前的信号连接
+    disconnect(ffmpegManager, nullptr, this, nullptr);
+
     // 连接FFmpeg信号
     connect(ffmpegManager, &FfmpegManager::ffmpegOutput, this,
             [this](const QString& output) {
@@ -704,9 +782,13 @@ void MainWindow::startMergeAfterScan()
                 if (success) {
                     appendLog(tr("[INFO] 合并操作完成"));
                     QMessageBox::information(this, tr("成功"), tr("视频合并完成！"));
+                    // ✅ 重置合并状态
+                    m_isMerging = false;
                 } else {
                     appendLog(tr("[ERROR] 合并操作失败"));
                     QMessageBox::critical(this, tr("错误"), tr("视频合并失败！"));
+                    // ✅ 重置合并状态
+                    m_isMerging = false;
                 }
             });
 
@@ -768,6 +850,9 @@ void MainWindow::startMergeOperation()
 
                     appendLog(tr("[INFO] 找到 %1 个视频组，开始合并").arg(videoGroups.size()));
 
+                    // 🔧 修复：在连接新信号前，先断开所有之前的信号连接
+                    disconnect(ffmpegManager, nullptr, this, nullptr);
+
                     // 连接FFmpeg信号
                     connect(ffmpegManager, &FfmpegManager::ffmpegOutput, this,
                             [this](const QString& output) {
@@ -789,9 +874,13 @@ void MainWindow::startMergeOperation()
                                 if (success) {
                                     appendLog(tr("[INFO] 合并操作完成"));
                                     QMessageBox::information(this, tr("成功"), tr("视频合并完成！"));
+                                    // ✅ 重置合并状态
+                                    m_isMerging = false;
                                 } else {
                                     appendLog(tr("[ERROR] 合并操作失败"));
                                     QMessageBox::critical(this, tr("错误"), tr("视频合并失败！"));
+                                    // ✅ 重置合并状态
+                                    m_isMerging = false;
                                 }
                             });
 
@@ -816,6 +905,9 @@ void MainWindow::mergeVideoGroup(const FileScanner::VideoGroup& videoGroup)
     QString outputDir = QDir(inputDir).filePath("merged");
     QDir().mkpath(outputDir);
 
+    int successCount = 0;
+    int errorCount = 0;
+
     for (const FileScanner::VideoFile& videoFile : videoGroup.files) {
         appendLog(tr("[INFO] 合并文件: %1").arg(videoFile.entryPath));
 
@@ -831,11 +923,56 @@ void MainWindow::mergeVideoGroup(const FileScanner::VideoGroup& videoGroup)
         );
 
         if (!success) {
+            errorCount++;
             appendLog(tr("[ERROR] 合并失败: %1").arg(videoFile.entryPath));
+
+            // 检查是否启用错误跳过
             if (!errorSkipAction->isChecked()) {
+                appendLog(tr("[ERROR] 用户选择停止合并"));
+                QMessageBox::critical(this, tr("合并失败"),
+                    tr("合并过程中遇到错误：\n%1\n\n已合并 %2 个文件，失败 %3 个文件")
+                    .arg(videoFile.entryPath).arg(successCount).arg(errorCount));
+                m_isMerging = false;
                 return;
+            } else {
+                appendLog(tr("[WARNING] 错误跳过已启用，继续处理下一个文件"));
+                // 更新统计
+                if (configManager) {
+                    configManager->updateUserStats(0, 0, 0.5); // 只记录时间，不记录成功文件
+                }
+                continue;
+            }
+        } else {
+            successCount++;
+            appendLog(tr("[SUCCESS] 合并成功: %1").arg(outputFile));
+
+            // 更新用户统计（仅在成功时）
+            if (configManager) {
+                configManager->updateUserStats(1, 0, 1.0);
             }
         }
+    }
+
+    // 合并完成，统计结果
+    if (errorCount > 0) {
+        appendLog(tr("[WARNING] 视频组处理完成 - 成功: %1, 失败: %2")
+                 .arg(successCount).arg(errorCount));
+
+        if (successCount == 0) {
+            QMessageBox::warning(this, tr("警告"),
+                tr("该视频组中所有文件合并失败！\n\n请检查：\n"
+                   "1. 原始文件是否损坏\n"
+                   "2. 磁盘空间是否充足\n"
+                   "3. FFmpeg是否正常工作"));
+        } else {
+            QMessageBox::information(this, tr("部分完成"),
+                tr("视频组处理完成！\n\n"
+                   "成功: %1 个文件\n"
+                   "失败: %2 个文件（已跳过）")
+                .arg(successCount).arg(errorCount));
+        }
+    } else {
+        appendLog(tr("[SUCCESS] 视频组处理完成 - 全部 %1 个文件合并成功").arg(successCount));
     }
 }
 
@@ -939,7 +1076,83 @@ void MainWindow::onDirectoryParseFailed(const QString &error)
 
 void MainWindow::onMergeButtonClicked()
 {
+    // ✅ 防重复点击：如果正在合并，直接返回
+    if (m_isMerging) {
+        appendLog(tr("[WARNING] 正在合并中，请等待完成"));
+        QMessageBox::information(this, tr("提示"), tr("正在合并中，请等待当前操作完成！"));
+        return;
+    }
+
     // 设置合并标志并开始扫描
     m_isMerging = true;
     onStartClicked();
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent *event)
+{
+    // 检查拖拽的数据类型
+    if (event->mimeData()->hasUrls()) {
+        // 确认是目录
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (!urls.isEmpty()) {
+            QString path = urls.first().toLocalFile();
+            QDir dir(path);
+            if (dir.exists()) {
+                event->acceptProposedAction();
+                appendLog(tr("[INFO] 检测到目录拖拽: %1").arg(path));
+            }
+        }
+    }
+}
+
+void MainWindow::dragMoveEvent(QDragMoveEvent *event)
+{
+    // 在拖拽过程中显示适当的视觉效果
+    event->acceptProposedAction();
+}
+
+void MainWindow::dropEvent(QDropEvent *event)
+{
+    // 获取拖拽的路径
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (!urls.isEmpty()) {
+            QString path = urls.first().toLocalFile();
+            QDir dir(path);
+
+            if (dir.exists()) {
+                // 设置路径并自动解析
+                setDirectoryPath(path);
+                appendLog(tr("[INFO] 通过拖拽设置目录: %1").arg(path));
+
+                // 视觉反馈：短暂改变目录选择区域边框颜色
+                directorySelector->setStyleSheet(
+                    "#directorySelector {"
+                    "    background-color: white;"
+                    "    border-radius: 12px;"
+                    "    border: 2px solid #4CAF50;"  // 绿色边框表示成功
+                    "}"
+                );
+
+                // 1秒后恢复原始样式
+                QTimer::singleShot(1000, [this]() {
+                    directorySelector->setStyleSheet(
+                        "#directorySelector {"
+                        "    background-color: white;"
+                        "    border-radius: 12px;"
+                        "    border: 1px solid #E0E0E0;"
+                        "}"
+                        "#directorySelector:hover {"
+                        "    border: 2px solid #2196F3;"
+                        "}"
+                    );
+                });
+
+                event->acceptProposedAction();
+            } else {
+                appendLog(tr("[ERROR] 拖拽的路径不是有效目录"));
+                QMessageBox::warning(this, tr("无效路径"), tr("请拖拽一个有效的目录路径！"));
+            }
+        }
+    }
 }

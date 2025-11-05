@@ -19,6 +19,11 @@
 #include <QGraphicsDropShadowEffect>
 #include <QPropertyAnimation>
 #include <QTimer>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
+#include <QDir>
 #include "core/ConfigManager.h"
 #include "core/FfmpegManager.h"
 #include "core/PatternManager.h"
@@ -61,6 +66,11 @@ private slots:
 
     // 错误跳过选项
     void onErrorSkipToggled(bool checked);
+
+    // 拖拽事件处理
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
+    void dragMoveEvent(QDragMoveEvent *event) override;
 
     // 目录操作
     void onDirectorySelected();

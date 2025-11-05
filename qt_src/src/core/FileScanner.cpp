@@ -357,15 +357,33 @@ QVariantMap FileScanner::extractMetadata(const QString &entryPath, const QVarian
 
     QFile file(entryPath);
     if (!file.open(QIODevice::ReadOnly)) {
+        emit scanLog(tr("[WARNING] 无法打开文件: %1").arg(entryPath));
         return metadata;
     }
 
     QByteArray data = file.readAll();
     file.close();
 
+    // 尝试解析JSON
     QJsonParseError parseError;
     QJsonDocument doc = QJsonDocument::fromJson(data, &parseError);
-    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+
+    // 如果解析失败，尝试检查并修复JSON格式
+    if (parseError.error != QJsonParseError::NoError) {
+        emit scanLog(tr("[WARNING] JSON解析失败，尝试自动修复: %1").arg(entryPath));
+        emit scanLog(tr("错误: %1").arg(parseError.errorString()));
+
+        if (validateAndRepairJson(entryPath, doc)) {
+            emit scanLog(tr("[SUCCESS] JSON修复成功"));
+        } else {
+            emit scanLog(tr("[ERROR] JSON修复失败，跳过此文件"));
+            return metadata;
+        }
+    }
+
+    // 检查是否为对象类型
+    if (!doc.isObject()) {
+        emit scanLog(tr("[WARNING] JSON不是有效对象格式: %1").arg(entryPath));
         return metadata;
     }
 
@@ -552,4 +570,120 @@ void FileScanner::processBLVFiles(VideoFile &videoFile, const QString &directory
     if (videoFile.isBlvFormat) {
         videoFile.blvPath = blvFiles.first(); // 主BLV文件
     }
+}
+
+bool FileScanner::validateAndRepairJson(const QString &filePath, QJsonDocument &doc)
+{
+    QString fixedContent;
+    if (checkAndFixJsonFormat(filePath, fixedContent)) {
+        QJsonParseError error;
+        doc = QJsonDocument::fromJson(fixedContent.toUtf8(), &error);
+
+        if (error.error == QJsonParseError::NoError) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool FileScanner::checkAndFixJsonFormat(const QString &filePath, QString &fixedContent)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        emit scanLog(tr("[WARNING] 无法打开JSON文件: %1").arg(filePath));
+        return false;
+    }
+
+    QTextStream stream(&file);
+    QString content = stream.readAll();
+    file.close();
+
+    // 尝试直接解析JSON
+    QJsonParseError error;
+    QJsonDocument::fromJson(content.toUtf8(), &error);
+
+    // 如果解析成功，直接返回
+    if (error.error == QJsonParseError::NoError) {
+        fixedContent = content;
+        return true;
+    }
+
+    emit scanLog(tr("[WARNING] 检测到损坏的JSON文件: %1").arg(filePath));
+    emit scanLog(tr("错误类型: %1").arg(error.errorString()));
+    emit scanLog(tr("尝试自动修复..."));
+
+    // 尝试修复JSON格式
+    fixJsonContent(content);
+
+    // 再次验证
+    error = QJsonParseError();
+    QJsonDocument::fromJson(content.toUtf8(), &error);
+
+    if (error.error == QJsonParseError::NoError) {
+        emit scanLog(tr("[SUCCESS] JSON文件修复成功"));
+
+        // 询问用户是否保存修复后的文件
+        // TODO: 可以添加一个选项自动保存
+        fixedContent = content;
+        return true;
+    } else {
+        emit scanLog(tr("[ERROR] JSON文件修复失败: %1").arg(error.errorString()));
+        return false;
+    }
+}
+
+void FileScanner::fixJsonContent(QString &content)
+{
+    // 根据Python版本的jsonCheck实现，主要修复多余的"}"字符
+
+    // 统计左大括号和右大括号
+    int leftBraces = content.count('{');
+    int rightBraces = content.count('}');
+
+    // 如果右大括号比左大括号多，说明有多余的右括号
+    if (rightBraces > leftBraces) {
+        emit scanLog(tr("检测到 %1 个多余的右大括号，尝试移除...").arg(rightBraces - leftBraces));
+
+        // 移除多余的右括号
+        // 从后往前删除多余的"}"字符
+        for (int i = 0; i < rightBraces - leftBraces; ++i) {
+            int lastIndex = content.lastIndexOf('}');
+            if (lastIndex != -1) {
+                content.remove(lastIndex, 1);
+            }
+        }
+    }
+    // 如果左大括号比右大括号多，说明缺少右括号
+    else if (leftBraces > rightBraces) {
+        emit scanLog(tr("检测到缺少 %1 个右大括号，尝试补全...").arg(leftBraces - rightBraces));
+
+        // 在文件末尾补全缺少的右括号
+        for (int i = 0; i < leftBraces - rightBraces; ++i) {
+            content.append("\n}");
+        }
+    }
+
+    // 尝试查找更复杂的格式错误
+    // 例如：多个连续的右括号 }}
+    content.replace("}}", "}");
+
+    // 尝试修复常见的JSON格式问题
+    // 移除末尾多余的逗号
+    content.replace(QRegularExpression(",\\s*}"), "}");
+    content.replace(QRegularExpression(",\\s*]"), "]");
+
+    // 确保文件以正确的字符结尾
+    content = content.trimmed();
+    if (!content.endsWith('}') && !content.endsWith(']')) {
+        content.append("\n}");
+    }
+}
+
+QString FileScanner::findMatchingBrace(const QString &content, int startPos) const
+{
+    Q_UNUSED(content);
+    Q_UNUSED(startPos);
+    // 这个方法为将来扩展预留，当前版本主要处理简单的多余括号问题
+    return QString();
 }

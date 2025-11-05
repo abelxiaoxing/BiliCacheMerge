@@ -79,6 +79,13 @@ public:
     double totalUsingTime() const;
     void setTotalUsingTime(double time);
 
+    // 用户统计和等级计算
+    void updateUserStats(int addedVideoNum = 1, int addedGroupNum = 0, double addedTimeMinutes = 0);
+    int calculateUserRank() const;
+    QString getRankDescription(int rank) const;
+    QString getRankTitle(int rank) const;
+    int getRankProgress() const;  // 获取下一等级的进度百分比
+
     // 路径相关
     QString configFilePath() const;
     QString defaultPatternPath() const;

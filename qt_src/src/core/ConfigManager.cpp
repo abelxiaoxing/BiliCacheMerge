@@ -4,6 +4,7 @@
 #include <QStandardPaths>
 #include <QApplication>
 #include <QDebug>
+#include <cmath>
 
 ConfigManager::ConfigManager(QObject *parent)
     : QObject(parent)
@@ -337,3 +338,77 @@ QString ConfigManager::defaultFfmpegPath() const {
 }
 QString ConfigManager::defaultFfprobePath() const { return m_ffprobePath; }
 QString ConfigManager::logFilePath() const { return m_logPath; }
+// 用户统计和等级计算
+void ConfigManager::updateUserStats(int addedVideoNum, int addedGroupNum, double addedTimeMinutes)
+{
+    // 更新统计值
+    int newVideoNum = totalVideoNum() + addedVideoNum;
+    int newGroupNum = totalGroupNum() + addedGroupNum;
+    double newTotalTime = totalUsingTime() + addedTimeMinutes;
+
+    setTotalVideoNum(newVideoNum);
+    setTotalGroupNum(newGroupNum);
+    setTotalUsingTime(newTotalTime);
+
+    // 重新计算等级
+    int newRank = calculateUserRank();
+    setUserRank(newRank);
+
+    // 自动保存配置
+    saveConfig();
+}
+
+int ConfigManager::calculateUserRank() const
+{
+    int totalVideos = totalVideoNum();
+    double totalTime = totalUsingTime();
+
+    // Python版本的等级计算公式：rank = int((merged_video/100)**0.3 + using_time/120) + 1
+    double rankValue = std::pow(totalVideos / 100.0, 0.3) + (totalTime / 120.0);
+    int rank = static_cast<int>(rankValue) + 1;
+
+    // 确保等级不低于1
+    return std::max(rank, 1);
+}
+
+QString ConfigManager::getRankDescription(int rank) const
+{
+    if (rank < 5) {
+        return "新手用户";
+    } else if (rank < 10) {
+        return "初级用户";
+    } else if (rank < 20) {
+        return "中级用户";
+    } else if (rank < 30) {
+        return "高级用户";
+    } else if (rank < 50) {
+        return "资深用户";
+    } else {
+        return "骨灰级用户";
+    }
+}
+
+QString ConfigManager::getRankTitle(int rank) const
+{
+    return QString("等级 %1 - %2").arg(rank).arg(getRankDescription(rank));
+}
+
+int ConfigManager::getRankProgress() const
+{
+    int currentRank = userRank();
+    int currentVideos = totalVideoNum();
+    double currentTime = totalUsingTime();
+
+    // 计算当前等级的起始值
+    double currentLevelStart = std::pow((currentVideos - 1) / 100.0, 0.3) + ((currentTime - 1) / 120.0);
+
+    // 计算下一等级的起始值
+    double nextLevelStart = std::pow((currentVideos + 100) / 100.0, 0.3) + (currentTime / 120.0);
+
+    // 计算当前值
+    double currentValue = std::pow(currentVideos / 100.0, 0.3) + (currentTime / 120.0);
+
+    // 计算进度百分比
+    double progress = (currentValue - currentLevelStart) / (nextLevelStart - currentLevelStart);
+    return static_cast<int>(progress * 100);
+}

@@ -33,23 +33,31 @@ set(SOURCES
     src/main.cpp
     src/application/MainWindow.cpp
     src/application/ConfigDialog.cpp
+    src/application/HelpDialog.cpp
+    src/application/LogViewer.cpp
+    src/application/PatternBuilderDialog.cpp
     src/core/ConfigManager.cpp
     src/core/FfmpegManager.cpp
     src/core/PatternManager.cpp
     src/core/FileScanner.cpp
     src/core/DanmakuConverter.cpp
     src/core/SubtitleDownloader.cpp
+    src/core/CoverDownloader.cpp
 )
 
 set(HEADERS
     src/application/MainWindow.h
     src/application/ConfigDialog.h
+    src/application/HelpDialog.h
+    src/application/LogViewer.h
+    src/application/PatternBuilderDialog.h
     src/core/ConfigManager.h
     src/core/FfmpegManager.h
     src/core/PatternManager.h
     src/core/FileScanner.h
     src/core/DanmakuConverter.h
     src/core/SubtitleDownloader.h
+    src/core/CoverDownloader.h
 )
 
 # 资源文件
