@@ -91,7 +91,6 @@ public:
     QString defaultPatternPath() const;
     QString defaultFfmpegPath() const;
     QString defaultFfprobePath() const;
-    QString logFilePath() const;
 
 signals:
     void configChanged();
@@ -108,7 +107,6 @@ private:
     QString m_patternPath;
     QString m_ffmpegPath;
     QString m_ffprobePath;
-    QString m_logPath;
 
     // 配置数据
     QMap<QString, QVariant> m_config;

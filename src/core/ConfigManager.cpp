@@ -28,11 +28,11 @@ void ConfigManager::initializeDefaultPaths()
     // 获取应用程序基础路径
     m_basePath = QCoreApplication::applicationDirPath();
 
-    // 设置默认路径 - 使用更可靠的路径计算
-    m_patternPath = QDir::cleanPath(m_basePath + "/../../pattern");
-    m_ffmpegPath = QDir::cleanPath(m_basePath + "/../../ffmpeg/ffmpeg");
-    m_ffprobePath = QDir::cleanPath(m_basePath + "/../../ffmpeg/ffprobe");
-    m_logPath = QDir::cleanPath(m_basePath + "/../../python_src/data/m4sMerge_bili.log");
+    // 设置默认路径 - 相对于可执行文件的位置
+    // 使用绝对路径，确保无论从哪里运行都能找到文件
+    m_patternPath = QDir::cleanPath(m_basePath + "/pattern");
+    m_ffmpegPath = QDir::cleanPath(m_basePath + "/ffmpeg/ffmpeg");
+    m_ffprobePath = QDir::cleanPath(m_basePath + "/ffmpeg/ffprobe");
 
     // 配置文件路径 (使用标准配置目录)
     QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
@@ -337,7 +337,6 @@ QString ConfigManager::defaultFfmpegPath() const {
     return customPermission() ? ffmpegPath() : m_ffmpegPath;
 }
 QString ConfigManager::defaultFfprobePath() const { return m_ffprobePath; }
-QString ConfigManager::logFilePath() const { return m_logPath; }
 // 用户统计和等级计算
 void ConfigManager::updateUserStats(int addedVideoNum, int addedGroupNum, double addedTimeMinutes)
 {
