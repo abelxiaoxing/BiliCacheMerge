@@ -275,7 +275,7 @@ cd BiliCacheMerge
 
 ```powershell
 # 1. 克隆项目
-git clone https://github.com/your-repo/BiliCacheMerge.git
+git clone https://github.com/abelxiaoxing/BiliCacheMerge.git
 cd BiliCacheMerge
 
 # 2. 创建构建目录
@@ -312,7 +312,7 @@ sudo apt-get update
 sudo apt-get install qt6-base-dev cmake build-essential
 
 # 2. 克隆并编译
-git clone https://github.com/your-repo/BiliCacheMerge.git
+git clone https://github.com/abelxiaoxing/BiliCacheMerge.git
 cd BiliCacheMerge
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -493,7 +493,7 @@ export LANG=zh_CN.UTF-8
 
 如遇到其他问题，请通过以下方式反馈：
 
-- **GitHub Issues**: [https://github.com/your-repo/BiliCacheMerge/issues](https://github.com/your-repo/BiliCacheMerge/issues)
+- **GitHub Issues**: [https://github.com/abelxiaoxing/BiliCacheMerge/issues](https://github.com/abelxiaoxing/BiliCacheMerge/issues)
 - **提交信息时请包含**:
   - 操作系统版本（Windows 10/11 或 Linux 发行版）
   - 程序版本号
@@ -531,7 +531,7 @@ export LANG=zh_CN.UTF-8
 ## 📞 联系我们
 
 - **项目主页**: [https://github.com/abelxiaoxing/BiliCacheMerge](https://github.com/abelxiaoxing/BiliCacheMerge)
-- **问题反馈**: [GitHub Issues](https://github.com/your-repo/BiliCacheMerge/issues)
+- **问题反馈**: [GitHub Issues](https://github.com/abelxiaoxing/BiliCacheMerge/issues)
 - **邮箱**: abelxiaoxing@qq.com
 
 ---
@@ -540,8 +540,8 @@ export LANG=zh_CN.UTF-8
 
 **⭐ 如果这个项目对您有帮助，请给我们一个 Star！ ⭐**
 
-[![GitHub stars](https://img.shields.io/github/stars/your-repo/BiliCacheMerge.svg?style=social&label=Star)](https://github.com/your-repo/BiliCacheMerge)
-[![GitHub forks](https://img.shields.io/github/forks/your-repo/BiliCacheMerge.svg?style=social&label=Fork)](https://github.com/your-repo/BiliCacheMerge/fork)
+[![GitHub stars](https://img.shields.io/github/stars/abelxiaoxing/BiliCacheMerge.svg?style=social&label=Star)](https://github.com/abelxiaoxing/BiliCacheMerge)
+[![GitHub forks](https://img.shields.io/github/forks/abelxiaoxing/BiliCacheMerge.svg?style=social&label=Fork)](https://github.com/abelxiaoxing/BiliCacheMerge/fork)
 
 Made with ❤️ by [abelxiaoxing](https://github.com/abelxiaoxing)
 
