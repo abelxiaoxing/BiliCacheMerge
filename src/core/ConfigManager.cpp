@@ -31,8 +31,16 @@ void ConfigManager::initializeDefaultPaths()
     // 设置默认路径 - 相对于可执行文件的位置
     // 使用绝对路径，确保无论从哪里运行都能找到文件
     m_patternPath = QDir::cleanPath(m_basePath + "/pattern");
+    
+#ifdef Q_OS_WIN
+    // Windows下使用.exe扩展名
+    m_ffmpegPath = QDir::cleanPath(m_basePath + "/ffmpeg/ffmpeg.exe");
+    m_ffprobePath = QDir::cleanPath(m_basePath + "/ffmpeg/ffprobe.exe");
+#else
+    // Linux/macOS下不使用扩展名
     m_ffmpegPath = QDir::cleanPath(m_basePath + "/ffmpeg/ffmpeg");
     m_ffprobePath = QDir::cleanPath(m_basePath + "/ffmpeg/ffprobe");
+#endif
 
     // 配置文件路径 (使用标准配置目录)
     QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);

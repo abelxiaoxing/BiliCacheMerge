@@ -6,10 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # 设置Qt路径
-set(CMAKE_PREFIX_PATH "/home/abelxiaoxing/Qt/6.9.2/gcc_64")
+set(CMAKE_PREFIX_PATH "C:/Qt/6.10.0/mingw_64")
 
 # 查找Qt6核心组件
-find_package(Qt6 6.9.2 COMPONENTS
+find_package(Qt6 6.10.0 COMPONENTS
     Core
     Widgets
     Concurrent
@@ -111,7 +111,7 @@ install(TARGETS ${PROJECT_NAME}
 
 # 输出构建信息
 message(STATUS "BiliCacheMerge Qt C++ Build Configuration:")
-message(STATUS "  Qt Version: 6.9.2")
+message(STATUS "  Qt Version: 6.10.0")
 message(STATUS "  C++ Standard: C++17")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Output Directory: ${CMAKE_BINARY_DIR}/bin")
